@@ -15,6 +15,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="/ledger/config.js"></script>
 <style>
   :root {
@@ -209,6 +210,23 @@
   }
   .date-range-apply:hover { opacity: 0.85; }
 
+  /* Import progress */
+  .import-bar {
+    position: fixed; bottom: 80px; right: 24px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px 16px; font-size: 0.75rem;
+    z-index: 1000; min-width: 200px; display: none;
+  }
+  .import-bar.show { display: block; }
+  .import-bar-label { color: var(--muted); margin-bottom: 6px; }
+  .import-bar-track {
+    height: 4px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .import-bar-fill {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width 0.2s; width: 0%;
+  }
+
   .tx-item.pending { opacity: 0.55; }
   .tx-item.pending .tx-dot { animation: pulse 1s infinite; }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
@@ -298,6 +316,9 @@
     <div class="nav-links">
       <a href="../app/" class="nav-link active">Home</a>
       <a href="../analytics/" class="nav-link">Analytics</a>
+      <input type="file" id="file-upload" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleImport(this)">
+      <button class="icon-btn" onclick="document.getElementById('file-upload').click()" title="Import XLSX">⇪</button>
+      <button class="icon-btn" onclick="exportData()" title="Export XLSX">⇩</button>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
       <button class="icon-btn theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
       <button class="nav-link logout" onclick="logout()">Logout</button>
@@ -347,6 +368,10 @@
 </main>
 
 <div class="toast" id="toast"></div>
+<div class="import-bar" id="import-bar">
+  <div class="import-bar-label" id="import-bar-label">Importing...</div>
+  <div class="import-bar-track"><div class="import-bar-fill" id="import-bar-fill"></div></div>
+</div>
 
 <!-- ── Edit Transaction Modal ── -->
 <div class="modal-overlay" id="edit-overlay" onclick="closeEdit(event)">
@@ -745,6 +770,126 @@ function showToast(msg, type = 'success') {
 async function logout() {
   await sb.auth.signOut();
   window.location.replace('../login/');
+}
+
+// ── Import ────────────────────────────────────────────────────
+async function handleImport(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = ''; // reset so same file can be re-imported
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let rows;
+    try {
+      const workbook = XLSX.read(e.target.result, { type: 'binary' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet);
+    } catch (err) {
+      return showToast('Could not read file', 'error');
+    }
+
+    if (!rows.length) return showToast('File is empty', 'error');
+
+    // Normalise column names — support common variations
+    // Expected: amount, type (expense/income), category, notes, date
+    const normalise = (row) => {
+      const get = (...keys) => {
+        for (const k of keys) {
+          const match = Object.keys(row).find(r => r.toLowerCase().trim() === k);
+          if (match !== undefined && row[match] !== undefined && row[match] !== '') return row[match];
+        }
+        return null;
+      };
+
+      const rawAmount = parseFloat(get('amount', 'amt', 'sum', 'value'));
+      if (isNaN(rawAmount)) return null; // skip rows with no amount
+
+      const rawDate = get('date', 'created_at', 'datetime', 'timestamp', 'time');
+      let created_at = new Date().toISOString();
+      if (rawDate) {
+        // XLSX sometimes gives date as a serial number
+        const parsed = typeof rawDate === 'number'
+          ? new Date(Math.round((rawDate - 25569) * 86400 * 1000))
+          : new Date(rawDate);
+        if (!isNaN(parsed)) created_at = parsed.toISOString();
+      }
+
+      const rawType = (get('type', 'kind', 'transaction type') || '').toString().toLowerCase();
+      const type = rawType.includes('inc') || rawAmount < 0 ? 'income' : 'expense';
+
+      return {
+        user_id:    currentUser.id,
+        amount:     Math.abs(rawAmount),
+        type,
+        category:   (get('category', 'cat', 'label', 'tag') || 'Other').toString(),
+        notes:      (get('notes', 'note', 'description', 'desc', 'memo') || '').toString(),
+        created_at,
+      };
+    };
+
+    const records = rows.map(normalise).filter(Boolean);
+    if (!records.length) return showToast('No valid rows found — check column names', 'error');
+
+    // Show progress bar
+    const bar = document.getElementById('import-bar');
+    const fill = document.getElementById('import-bar-fill');
+    const label = document.getElementById('import-bar-label');
+    bar.classList.add('show');
+
+    // Insert in batches of 50
+    const BATCH = 50;
+    let done = 0;
+    for (let i = 0; i < records.length; i += BATCH) {
+      const batch = records.slice(i, i + BATCH);
+      const { error } = await sb.from('transactions').insert(batch);
+      if (error) { showToast('Import failed on batch', 'error'); break; }
+      done += batch.length;
+      const pct = Math.round((done / records.length) * 100);
+      fill.style.width = pct + '%';
+      label.textContent = `Importing… ${done} / ${records.length}`;
+    }
+
+    bar.classList.remove('show');
+    fill.style.width = '0%';
+    showToast(`Imported ${done} transactions`, 'success');
+    loadTransactions(true);
+    loadStats();
+  };
+
+  reader.readAsBinaryString(file);
+}
+
+// ── Export ────────────────────────────────────────────────────
+async function exportData() {
+  showToast('Preparing export…', 'success');
+
+  // Fetch ALL transactions for export (ignore current period filter)
+  const { data, error } = await sb.from('transactions')
+    .select('*').order('created_at', { ascending: false });
+
+  if (error || !data?.length) return showToast('No data to export', 'error');
+
+  const rows = data.map(t => ({
+    Date:     new Date(t.created_at).toLocaleDateString(),
+    Type:     t.type,
+    Category: t.category,
+    Amount:   parseFloat(t.amount),
+    Notes:    t.notes || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+
+  // Auto-size columns
+  const colWidths = Object.keys(rows[0]).map(key => ({
+    wch: Math.max(key.length, ...rows.map(r => String(r[key]).length))
+  }));
+  ws['!cols'] = colWidths;
+
+  XLSX.writeFile(wb, `ledger-export-${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast(`Exported ${rows.length} transactions`, 'success');
 }
 
 // Keyboard shortcuts
