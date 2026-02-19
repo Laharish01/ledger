@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="theme.js"></script>
+<script src="/ledger/theme.js"></script>
 <script>
   // If already logged in, go straight to app
 </script>
@@ -11,7 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<script src="/ledger/config.js"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -233,7 +233,7 @@
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 sb.auth.getSession().then(({ data }) => {
-  if (data.session) window.location.replace('app.html');
+  if (data.session) window.location.replace('../app/');
 });
 
 function switchTab(tab) {
@@ -263,7 +263,7 @@ async function login() {
   const { error } = await sb.auth.signInWithPassword({ email, password });
   setLoading('login-btn', false);
   if (error) return showMsg(error.message);
-  window.location.replace('app.html');
+  window.location.replace('../app/');
 }
 
 async function register() {

@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="theme.js"></script>
+<script src="/ledger/theme.js"></script>
 <script>
   (async () => {
     const stored = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
-    if (!stored) window.location.replace('index.html');
+    if (!stored) window.location.replace('../login/');
   })();
 </script>
 <meta charset="UTF-8">
@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="config.js"></script>
+<script src="/ledger/config.js"></script>
 <style>
   :root {
     --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
@@ -251,12 +251,12 @@
 <div class="grid-bg"></div>
 
 <nav>
-  <a class="nav-brand" href="app.html">Ledger</a>
+  <a class="nav-brand" href="../app/">Ledger</a>
   <div class="nav-right">
     <span class="nav-user" id="nav-user"></span>
     <div class="nav-links">
-      <a href="app.html" class="nav-link active">Home</a>
-      <a href="analytics.html" class="nav-link">Analytics</a>
+      <a href="../app/" class="nav-link active">Home</a>
+      <a href="../analytics/" class="nav-link">Analytics</a>
       <button class="icon-btn" onclick="openSettings()" title="Settings">⚙</button>
       <button class="icon-btn theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
       <button class="nav-link logout" onclick="logout()">Logout</button>
@@ -407,7 +407,7 @@ function parseInput(raw) {
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
   const { data: { session } } = await sb.auth.getSession();
-  if (!session) return window.location.replace('index.html');
+  if (!session) return window.location.replace('../login/');
   currentUser = session.user;
   document.getElementById('nav-user').textContent = currentUser.email;
   await loadSettings();
@@ -637,7 +637,7 @@ function showToast(msg, type = 'success') {
 
 async function logout() {
   await sb.auth.signOut();
-  window.location.replace('index.html');
+  window.location.replace('../login/');
 }
 
 // Keyboard shortcuts
