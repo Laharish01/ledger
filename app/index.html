@@ -449,6 +449,17 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="delete-overlay" onclick="closeModal()">
+  <div class="modal">
+    <div class="modal-title">Are you sure you want to delete?</div>
+    <div class="modal-actions">
+    <button class="modal-btn secondary" onclick="closeModal()">No</button>
+    <button class="modal-btn primary" onclick="confirmDelete()">Yes</button>
+  </div>
+  </div>
+  
+</div>
+
 <script>
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
@@ -740,22 +751,37 @@ async function saveEdit() {
 }
 
 // ── Delete (optimistic) ──────────────────────────────────────
-async function deleteTx(id) {
-  // Optimistic: remove from UI instantly, keep snapshot for rollback
-  const snapshot = [...transactions];
-  transactions = transactions.filter(t => t.id != id);
-  renderTransactions();
-  updateStatsFrom(transactions);
-  showToast('Deleted', 'success');
+let delId;
+async function deleteTx(id) {  
+  delId = id;
+  const deleteOverlay = document.getElementById('delete-overlay');
+  deleteOverlay.classList.add('open');
+}
 
-  // Sync in background
-  const { error } = await sb.from('transactions').delete().eq('id', id);
-  if (error) {
-    transactions = snapshot;
+async function confirmDelete(){
+  // Optimistic: remove from UI instantly, keep snapshot for rollback
+    const snapshot = [...transactions];
+    transactions = transactions.filter(t => t.id != delId);
     renderTransactions();
     updateStatsFrom(transactions);
-    showToast('Delete failed — rolled back', 'error');
-  }
+    showToast('Deleted', 'success');
+
+    // Sync in background
+    const { error } = await sb.from('transactions').delete().eq('id', delId);
+    if (error) {
+      transactions = snapshot;
+      renderTransactions();
+      updateStatsFrom(transactions);
+      showToast('Delete failed — rolled back', 'error');
+    }
+    delId = undefined;
+    const deleteOverlay = document.getElementById('delete-overlay');
+    deleteOverlay.classList.remove('open');
+}
+
+function closeModal() {
+  const deleteOverlay = document.getElementById('delete-overlay');
+  deleteOverlay.classList.remove('open');
 }
 
 function loadMore() { loadTransactions(false); }
