@@ -9,7 +9,7 @@
   })();
 </script>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger — Dashboard</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
@@ -200,7 +200,7 @@
   .field input, .field select {
     width: 100%; background: var(--bg); border: 1px solid var(--border);
     border-radius: 8px; padding: 10px 12px; color: var(--text);
-    font-family: 'Roboto', sans-serif; font-size: 0.85rem;
+    font-family: 'Roboto', sans-serif; font-size: 16px;
     outline: none; transition: border-color 0.2s; appearance: none;
   }
   .field input:focus, .field select:focus { border-color: var(--accent); }
@@ -234,10 +234,17 @@
     .stats-grid { gap: 8px; }
     .stat-value { font-size: 1.2rem; }
     .stat-card { padding: 12px; }
-    .main-input { font-size: 0.95rem; }
+    .main-input { font-size: 16px; }
     .tx-actions { opacity: 1; }
   }
   @media (max-width: 400px) { .stats-grid { grid-template-columns: 1fr; } }
+
+  /* Prevent iOS Safari auto-zoom on any input/select focus */
+  @media (max-width: 768px) {
+    input, select, textarea { font-size: 16px !important; }
+    .modal { margin: 0 8px; }
+    .modal-actions { flex-direction: column; }
+  }
 </style>
 </head>
 <body>
