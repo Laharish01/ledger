@@ -1,0 +1,11 @@
+# If you edit config.js locally with real keys for testing,
+# uncomment the line below so you never accidentally commit them.
+# Re-comment it before pushing if you want to update the placeholder.
+
+#config.js
+
+schema.sql
+
+# OS files
+.DS_Store
+Thumbs.db
