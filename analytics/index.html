@@ -40,6 +40,18 @@
     background-size: 40px 40px; pointer-events: none;
   }
 
+    input {
+    width: 100%; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 14px; color: var(--text);
+    font-family: 'Roboto', sans-serif; font-size: 16px;
+    outline: none; transition: border-color 0.2s, background 0.3s;
+  }
+  input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(200,245,96,0.08);
+  }
+
   nav {
     position: sticky; top: 0; z-index: 100;
     background: rgba(10,10,15,0.9); backdrop-filter: blur(20px);
@@ -125,7 +137,7 @@
 </nav>
 
 <main>
-  <div class="page-title">Analytics</div>
+  <div class="page-title">Analytics <input id="search-input" type="text" placeholder="Enter search query" ></input></div>
   <div id="content"><div class="empty-analytics"><p>Loading data...</p></div></div>
 </main>
 
@@ -167,11 +179,25 @@ async function init() {
   if (settings?.currency) userCurrency = settings.currency;
 
   loadAnalytics();
+
+  const searchInput = document.getElementById('search-input');
+  searchInput.addEventListener('blur', (e) => {
+    if (searchQ == e.target.value) return;
+    loadAnalytics(e.target.value);
+    searchQ = e.target.value;
+  })
 }
 
-async function loadAnalytics() {
-  const { data, error } = await sb.from('transactions')
-    .select('amount, type, category, created_at').order('created_at', { ascending: true });
+let searchQ;
+
+async function loadAnalytics(searchq) {
+  let data, error;
+  if (searchq) {
+    ({ data, error } = await sb.from('transactions').select('amount, type, category, created_at').textSearch('notes', `${searchq}`).order('created_at', { ascending: true }));
+  }else {
+    ({ data, error } = await sb.from('transactions').select('amount, type, category, created_at').order('created_at', { ascending: true }));
+  }
+  
 
   if (error || !data?.length) {
     document.getElementById('content').innerHTML = `
