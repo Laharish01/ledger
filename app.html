@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #161622;
+    --border: #1e1e2e;
+    --accent: #c8f560;
+    --accent2: #7c6af7;
+    --text: #e8e8f0;
+    --muted: #5a5a7a;
+    --danger: #ff5f6d;
+    --success: #4ade80;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+  }
+
+  .grid-bg {
+    position: fixed;
+    inset: 0;
+    background-image: 
+      linear-gradient(rgba(200,245,96,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(200,245,96,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* NAV */
+  nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.9);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .nav-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.4rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .nav-right { display: flex; align-items: center; gap: 16px; }
+
+  .nav-user {
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .nav-links { display: flex; gap: 4px; }
+
+  .nav-link {
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: none;
+    background: none;
+    color: var(--muted);
+    transition: all 0.2s;
+    text-decoration: none;
+    display: inline-block;
+  }
+
+  .nav-link:hover, .nav-link.active { color: var(--text); background: var(--border); }
+  .nav-link.logout { color: var(--danger); }
+  .nav-link.logout:hover { background: rgba(255,95,109,0.1); }
+
+  /* MAIN */
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 80px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* INPUT SECTION */
+  .input-section { margin-bottom: 40px; }
+
+  .input-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .input-wrapper {
+    position: relative;
+  }
+
+  .main-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 60px 20px 20px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 1.1rem;
+    outline: none;
+    transition: all 0.2s;
+    caret-color: var(--accent);
+  }
+
+  .main-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(200,245,96,0.08), 0 20px 60px rgba(0,0,0,0.4);
+  }
+
+  .main-input::placeholder { color: var(--muted); font-size: 0.9rem; }
+
+  .submit-btn {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 36px;
+    height: 36px;
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    color: #0a0a0f;
+    font-size: 1rem;
+  }
+
+  .submit-btn:hover { transform: translateY(-50%) scale(1.05); }
+
+  .input-hint {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 0.03em;
+  }
+
+  .input-hint span { color: var(--accent); }
+
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 18px;
+    font-size: 0.8rem;
+    z-index: 1000;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-width: 300px;
+  }
+
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: rgba(74,222,128,0.4); color: var(--success); }
+  .toast.error { border-color: rgba(255,95,109,0.4); color: var(--danger); }
+
+  /* STATS */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+
+  .stat-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .stat-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.5rem;
+    color: var(--text);
+  }
+
+  .stat-value.expense { color: var(--danger); }
+  .stat-value.income { color: var(--success); }
+
+  /* TRANSACTIONS */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .tx-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .tx-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    animation: slideIn 0.3s ease forwards;
+    transition: border-color 0.2s;
+  }
+
+  .tx-item:hover { border-color: #2e2e4e; }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .tx-category-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .tx-info { flex: 1; min-width: 0; }
+
+  .tx-top {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tx-category {
+    font-size: 0.8rem;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+
+  .tx-notes {
+    font-size: 0.75rem;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tx-date {
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  .tx-amount {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.1rem;
+    flex-shrink: 0;
+  }
+
+  .tx-amount.expense { color: var(--danger); }
+  .tx-amount.income { color: var(--success); }
+
+  .tx-delete {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 4px;
+    opacity: 0;
+    transition: all 0.2s;
+    flex-shrink: 0;
+  }
+
+  .tx-item:hover .tx-delete { opacity: 1; }
+  .tx-delete:hover { color: var(--danger); }
+
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-state .big { font-size: 3rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.8rem; letter-spacing: 0.05em; }
+
+  .load-more {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    padding: 10px;
+    background: none;
+    border: 1px dashed var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+
+  .load-more:hover { border-color: var(--accent); color: var(--accent); }
+
+  @media (max-width: 600px) {
+    nav { padding: 0 16px; }
+    .nav-user { display: none; }
+    .stats-grid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .stat-value { font-size: 1.2rem; }
+    .stat-card { padding: 12px; }
+    .main-input { font-size: 0.95rem; }
+  }
+
+  @media (max-width: 400px) {
+    .stats-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<nav>
+  <a class="nav-brand" href="app.html">Ledger</a>
+  <div class="nav-right">
+    <span class="nav-user" id="nav-username"></span>
+    <div class="nav-links">
+      <a href="app.html" class="nav-link active">Home</a>
+      <a href="analytics.html" class="nav-link">Analytics</a>
+      <button class="nav-link logout" onclick="logout()">Logout</button>
+    </div>
+  </div>
+</nav>
+
+<main>
+  <!-- INPUT -->
+  <div class="input-section">
+    <div class="input-label">New Transaction</div>
+    <div class="input-wrapper">
+      <input 
+        class="main-input" 
+        id="tx-input" 
+        type="text"
+        placeholder="50 Food Lunch at the cafe..."
+        autocomplete="off"
+        autofocus
+      >
+      <button class="submit-btn" onclick="addTransaction()" title="Add (Enter)">↵</button>
+    </div>
+    <div class="input-hint">
+      Format: <span>&lt;Amount&gt; &lt;Category&gt; &lt;Notes&gt;</span> — 
+      Use <span>-50</span> for income. Press <span>Enter</span> to save.
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-label">Total Spent</div>
+      <div class="stat-value expense" id="stat-expense">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Total Income</div>
+      <div class="stat-value income" id="stat-income">—</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Transactions</div>
+      <div class="stat-value" id="stat-count">—</div>
+    </div>
+  </div>
+
+  <!-- TRANSACTIONS -->
+  <div class="section-header">
+    <div class="section-title">Recent Transactions</div>
+  </div>
+  <div class="tx-list" id="tx-list">
+    <div class="empty-state">
+      <div class="big">📊</div>
+      <p>Loading transactions...</p>
+    </div>
+  </div>
+  <button class="load-more" id="load-more-btn" onclick="loadMore()" style="display:none">Load more</button>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = localStorage.getItem('api_url') || 'http://localhost:3001';
+const token = localStorage.getItem('token');
+const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+if (!token) window.location.href = 'index.html';
+
+document.getElementById('nav-username').textContent = user.username || '';
+
+const CATEGORY_COLORS = [
+  '#c8f560','#7c6af7','#ff5f6d','#4ade80','#fb923c',
+  '#38bdf8','#e879f9','#fbbf24','#34d399','#f87171'
+];
+
+let colorMap = {};
+let colorIdx = 0;
+function getCategoryColor(cat) {
+  if (!colorMap[cat]) colorMap[cat] = CATEGORY_COLORS[colorIdx++ % CATEGORY_COLORS.length];
+  return colorMap[cat];
+}
+
+let offset = 0;
+const LIMIT = 20;
+let allLoaded = false;
+let transactions = [];
+
+async function apiFetch(path, options = {}) {
+  const res = await fetch(`${API}${path}`, {
+    ...options,
+    headers: { 
+      'Content-Type': 'application/json', 
+      'Authorization': `Bearer ${token}`,
+      ...options.headers 
+    }
+  });
+  if (res.status === 401) { logout(); return; }
+  return res;
+}
+
+async function loadStats() {
+  try {
+    const res = await apiFetch('/api/transactions/analytics');
+    const data = await res.json();
+    const t = data.totals;
+    document.getElementById('stat-expense').textContent = fmt(t.total_expenses || 0);
+    document.getElementById('stat-income').textContent = fmt(t.total_income || 0);
+    document.getElementById('stat-count').textContent = t.total_transactions || 0;
+  } catch {}
+}
+
+async function loadTransactions(reset = false) {
+  if (reset) { offset = 0; transactions = []; allLoaded = false; }
+  try {
+    const res = await apiFetch(`/api/transactions?limit=${LIMIT}&offset=${offset}`);
+    const data = await res.json();
+    if (data.length < LIMIT) allLoaded = true;
+    transactions = reset ? data : [...transactions, ...data];
+    offset += data.length;
+    renderTransactions();
+    document.getElementById('load-more-btn').style.display = allLoaded ? 'none' : 'block';
+  } catch {
+    document.getElementById('tx-list').innerHTML = `<div class="empty-state"><p>Failed to load. Is the backend running?</p></div>`;
+  }
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
+function timeAgo(dateStr) {
+  const diff = (Date.now() - new Date(dateStr)) / 1000;
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function renderTransactions() {
+  const list = document.getElementById('tx-list');
+  if (transactions.length === 0) {
+    list.innerHTML = `<div class="empty-state"><div class="big">💸</div><p>No transactions yet. Add one above!</p></div>`;
+    return;
+  }
+  list.innerHTML = transactions.map(tx => `
+    <div class="tx-item" id="tx-${tx.id}">
+      <div class="tx-category-dot" style="background:${getCategoryColor(tx.category)}"></div>
+      <div class="tx-info">
+        <div class="tx-top">
+          <span class="tx-category">${escHtml(tx.category)}</span>
+          ${tx.notes ? `<span class="tx-notes">${escHtml(tx.notes)}</span>` : ''}
+        </div>
+        <div class="tx-date">${timeAgo(tx.created_at)}</div>
+      </div>
+      <div class="tx-amount ${tx.type}">${tx.type === 'expense' ? '-' : '+'}${fmt(tx.amount)}</div>
+      <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Delete">✕</button>
+    </div>
+  `).join('');
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+async function addTransaction() {
+  const input = document.getElementById('tx-input');
+  const val = input.value.trim();
+  if (!val) return;
+
+  input.disabled = true;
+  try {
+    const res = await apiFetch('/api/transactions', {
+      method: 'POST',
+      body: JSON.stringify({ input: val })
+    });
+    const data = await res.json();
+    if (!res.ok) return showToast(data.error, 'error');
+    input.value = '';
+    showToast(`Added: ${data.category} ${fmt(data.amount)}`, 'success');
+    await Promise.all([loadTransactions(true), loadStats()]);
+  } catch {
+    showToast('Server error', 'error');
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+}
+
+async function deleteTransaction(id) {
+  const el = document.getElementById(`tx-${id}`);
+  el.style.opacity = '0.3';
+  try {
+    await apiFetch(`/api/transactions/${id}`, { method: 'DELETE' });
+    transactions = transactions.filter(t => t.id !== id);
+    renderTransactions();
+    loadStats();
+    showToast('Deleted', 'success');
+  } catch {
+    el.style.opacity = '1';
+    showToast('Delete failed', 'error');
+  }
+}
+
+function loadMore() { loadTransactions(false); }
+
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function logout() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  window.location.href = 'index.html';
+}
+
+document.getElementById('tx-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addTransaction();
+});
+
+// Init
+loadTransactions(true);
+loadStats();
+</script>
+</body>
+</html>
