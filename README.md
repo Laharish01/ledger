@@ -1,4 +1,4 @@
-# 💰 Simple Ledger — Finance Tracker
+# 💰 Simple Ledger — Finance Tracker - With Charts!
 
 Fully static finance tracker. No backend server.
 GitHub Pages for hosting · Supabase for auth and database.
