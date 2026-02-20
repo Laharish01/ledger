@@ -9,9 +9,4 @@
 // ============================================================
 const API_URL  = "https://ledger-api.notkazuya21.workers.dev";
 const API_KEY  = "pkR7gJX64q2woZeLcq2EwtDkx9CzqfTM";
-const BASE_URL = "../";
 
-// Set <base> so relative paths work from any subfolder
-(function () {
-  
-})();

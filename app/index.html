@@ -462,7 +462,7 @@
 </div>
 
 <script>
-
+let baseUrl = window.location.href.includes('localhost') ? "../" : "ledger";
 const LIMIT = 20;
 let offset = 0, transactions = [], currentUser = null;
 let activePeriod = 'recent';
@@ -500,7 +500,7 @@ function parseInput(raw) {
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
-  if (!api.auth.isLoggedIn()) return window.location.replace('../login/');
+  if (!api.auth.isLoggedIn()) return window.location.replace(baseUrl + '/login/');
   const accountId = api.auth.getAccountId();
   document.getElementById('nav-user').textContent = accountId;
   document.getElementById('nav-user').title = 'Click to copy Account ID';

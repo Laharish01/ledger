@@ -189,7 +189,8 @@
 </div>
 
 <script>
-if (api.auth.isLoggedIn()) window.location.replace('../app/');
+let baseUrl = window.location.href.includes('localhost') ? "../" : "ledger";
+if (api.auth.isLoggedIn()) window.location.replace(baseUrl + '/app/');
 
 let generatedId = null;
 
@@ -227,7 +228,7 @@ async function createAccount() {
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
     await api.auth.create(generatedId);
-    window.location.replace('../app/');
+    window.location.replace(baseUrl + '/app/');
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Create Account & Sign In';
     showMsg(e.message || 'Failed to create account');
@@ -241,7 +242,7 @@ async function login() {
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
     await api.auth.login(raw);
-    window.location.replace('../app/');
+    window.location.replace(baseUrl + '/app/');
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Sign In';
     showMsg('Account ID not found or invalid');

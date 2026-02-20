@@ -143,7 +143,8 @@
 </main>
 
 <script>
-let userCurrency = 'USD';
+let baseUrl = window.location.href.includes('localhost') ? "../" : "ledger";
+let userCurrency = 'INR';
 
 const COLORS = ['#c8f560','#7c6af7','#ff5f6d','#4ade80','#fb923c',
                 '#38bdf8','#e879f9','#fbbf24','#34d399','#f87171',
@@ -171,7 +172,7 @@ function chartDefaults() {
 }
 
 async function init() {
-  if (!api.auth.isLoggedIn()) return window.location.replace('../login/');
+  if (!api.auth.isLoggedIn()) return window.location.replace(baseUrl + '/login/');
   try {
     const s = await api.settings.get();
     if (s?.currency) userCurrency = s.currency;
@@ -194,7 +195,7 @@ async function loadAnalytics(searchq) {
     document.getElementById('content').innerHTML = `
       <div class="empty-analytics">
         <div class="big">📈</div>
-        <p>No data yet. <a href="../app/">Add some transactions</a> to see analytics.</p>
+        <p>No data yet. <a href="${baseUrl}/app/">Add some transactions</a> to see analytics.</p>
       </div>`;
     return;
   }
