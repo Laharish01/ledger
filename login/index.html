@@ -225,7 +225,7 @@ async function createAccount() {
   const btn = document.getElementById('create-btn');
   btn.disabled = true; btn.textContent = 'Creating…';
   try {
-    await api.auth.create();
+    await api.auth.create(generatedId);
     window.location.replace('../app/');
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Create Account & Sign In';

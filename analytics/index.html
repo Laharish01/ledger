@@ -188,7 +188,7 @@ let searchQ;
 
 async function loadAnalytics(searchq) {
   let data;
-  try { data = await api.transactions.list({ limit: 10000 }); } catch {}
+  try { data = await api.transactionsAPI.list({ limit: 10000 }); } catch {}
   if (!data?.length) {
     document.getElementById('content').innerHTML = `
       <div class="empty-analytics">

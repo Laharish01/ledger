@@ -51,8 +51,11 @@ async function apiFetch(path, options = {}) {
 // ── Auth ──────────────────────────────────────────────────────
 
 const auth = {
-  async create() {
-    const data = await apiFetch('/api/account/create', { method: 'POST' });
+  async create(accountId) {
+    const data = await apiFetch('/api/account/create', {
+      method: 'POST',
+      body: JSON.stringify({ accountId }),
+    });
     saveSession(data.accountId, data.token);
     return data;
   },
@@ -112,4 +115,4 @@ const transactionsAPI = {
 };
 
 // Export as global `api`
-window.api = { auth, settings, transactions: transactionsAPI };
+window.api = { auth, settings, transactionsAPI };
