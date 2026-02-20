@@ -84,7 +84,7 @@ const settings = {
 
 // ── Transactions ──────────────────────────────────────────────
 
-const transactions = {
+const transactionsAPI = {
   async list(params = {}) {
     const q = new URLSearchParams();
     if (params.limit)  q.set('limit',  params.limit);
@@ -112,4 +112,4 @@ const transactions = {
 };
 
 // Export as global `api`
-window.api = { auth, settings, transactions };
+window.api = { auth, settings, transactions: transactionsAPI };
