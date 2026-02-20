@@ -2,8 +2,8 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main]
-  workflow_dispatch:  # allows manual trigger from GitHub Actions UI
+    branches: [main, master]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -24,13 +24,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject Supabase credentials into config.js
+      - name: Inject config
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          API_URL: ${{ secrets.API_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
         run: |
-          printf 'const SUPABASE_URL  = "%s";\nconst SUPABASE_ANON = "%s";\n' \
-            "$SUPABASE_URL" "$SUPABASE_ANON_KEY" > config.js
+          printf 'const API_URL  = "%s";\nconst API_KEY  = "%s";\nconst BASE_URL = "/ledger/";\n(function(){const b=document.createElement("base");b.href=BASE_URL;document.head.prepend(b);})();\n' \
+            "$API_URL" "$API_KEY" > config.js
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
