@@ -7,6 +7,7 @@
 <link rel="icon" type="image/x-icon" href="/ledger/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
+<base href="/ledger/">
 <script src="config.js"></script>
 <script src="api.js"></script>
 <script src="theme.js"></script>
@@ -198,7 +199,7 @@ function showPanel(name) {
   showMsg('');
   if (name === 'create') {
     const seg = () => String(Math.floor(1000 + Math.random() * 9000));
-    generatedId = `${seg()}-${seg()}-${seg()}`;
+    generatedId = `${seg()}-${seg()}-${seg()}-${seg()}`;
     document.getElementById('new-account-id').textContent = generatedId;
   }
   if (name === 'login') {

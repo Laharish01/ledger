@@ -1,6 +1,6 @@
 // ============================================================
 //  api.js — Ledger API client
-//  Replaces the Supabase SDK. Reads API_URL from config.js.
+//  Reads API_URL from config.js.
 // ============================================================
 
 const TOKEN_KEY = 'ledger_token';

@@ -7,14 +7,11 @@
 //
 //  For local dev, fill in real values below (never commit them)
 // ============================================================
-const API_URL  = "INJECTED_AT_BUILD";
-const API_KEY  = "INJECTED_AT_BUILD";
-const BASE_URL = "INJECTED_AT_BUILD";
+const API_URL  = "https://ledger-api.notkazuya21.workers.dev";
+const API_KEY  = "pkR7gJX64q2woZeLcq2EwtDkx9CzqfTM";
+const BASE_URL = "../";
 
 // Set <base> so relative paths work from any subfolder
 (function () {
-  const base = document.createElement('base');
-  base.href = (typeof BASE_URL !== 'undefined' && BASE_URL !== 'INJECTED_AT_BUILD')
-    ? BASE_URL : '/';
-  document.head.prepend(base);
+  
 })();
