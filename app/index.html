@@ -583,7 +583,7 @@ async function loadTransactions(reset = false) {
   const { from, to } = getPeriodRange();
   let data;
   try {
-    data = await api.transactions.list({
+    data = await api.transactionsAPI.list({
       limit,
       offset: activePeriod !== 'recent' ? offset : undefined,
       from: from || undefined,
@@ -654,7 +654,7 @@ function updateStatsFrom(txns) {
 // Full reload from DB (used on init and load-more)
 async function loadStats() {
   try {
-    const rows = await api.transactions.stats();
+    const rows = await api.transactionsAPI.stats();
     // rows is [{type, total, count}, ...]
     let expenses = 0, income = 0, count = 0;
     rows.forEach(r => {
@@ -688,7 +688,7 @@ async function addTransaction() {
   // Sync in background
   let data;
   try {
-    data = await api.transactions.create(parsed);
+    data = await api.transactionsAPI.create(parsed);
   } catch {
     transactions = transactions.filter(t => t.id !== tempId);
     renderTransactions();
@@ -757,7 +757,7 @@ async function saveEdit() {
 
   // Sync in background
   try {
-    await api.transactions.update(savedId, updates);
+    await api.transactionsAPI.update(savedId, updates);
   } catch {
     if (idx !== -1 && original) transactions[idx] = original;
     renderTransactions();
@@ -784,7 +784,7 @@ async function confirmDelete(){
 
   // Sync in background
   try {
-    await api.transactions.remove(id);
+    await api.transactionsAPI.remove(id);
   } catch {
     transactions = snapshot;
     renderTransactions();
@@ -885,7 +885,7 @@ async function handleImport(input) {
     for (let i = 0; i < records.length; i += BATCH) {
       const batch = records.slice(i, i + BATCH);
       try {
-        for (const tx of batch) await api.transactions.create(tx);
+        for (const tx of batch) await api.transactionsAPI.create(tx);
       } catch { showToast('Import failed on batch', 'error'); break; }
       done += batch.length;
       const pct = Math.round((done / records.length) * 100);
@@ -910,7 +910,7 @@ async function exportData() {
   // Fetch ALL transactions for export (ignore current period filter)
   let data;
   try {
-    data = await api.transactions.list({ limit: 10000 });
+    data = await api.transactionsAPI.list({ limit: 10000 });
   } catch { return showToast('No data to export', 'error'); }
   if (!data?.length) return showToast('No data to export', 'error');
 
