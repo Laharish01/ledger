@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/ledger/theme.js"></script>
 <script>
   (async () => {
     const stored = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
@@ -14,9 +13,10 @@
 <link rel="icon" type="image/x-icon" href="/ledger/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-<script src="/ledger/config.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="theme.js"></script>
 <style>
   :root {
     --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
@@ -461,11 +461,10 @@
 </div>
 
 <script>
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
 const LIMIT = 20;
 let offset = 0, transactions = [], currentUser = null;
-let activePeriod = 'recent';   // recent | week | month | year | custom
+let activePeriod = 'recent';
 let customFrom = null, customTo = null;
 let userCurrency = 'USD';
 let editingId = null, editingType = 'expense';
@@ -500,18 +499,27 @@ function parseInput(raw) {
 
 // ── Init ─────────────────────────────────────────────────────
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return window.location.replace('../login/');
-  currentUser = session.user;
-  document.getElementById('nav-user').textContent = currentUser.email;
+  if (!api.auth.isLoggedIn()) return window.location.replace('../login/');
+  const accountId = api.auth.getAccountId();
+  document.getElementById('nav-user').textContent = accountId;
+  document.getElementById('nav-user').title = 'Click to copy Account ID';
+  document.getElementById('nav-user').style.cursor = 'pointer';
+  document.getElementById('nav-user').onclick = () => {
+    navigator.clipboard.writeText(accountId).then(() => {
+      document.getElementById('nav-user').textContent = 'Copied!';
+      setTimeout(() => document.getElementById('nav-user').textContent = accountId, 2000);
+    });
+  };
   await loadSettings();
   await Promise.all([loadTransactions(true), loadStats()]);
 }
 
 // ── Settings ─────────────────────────────────────────────────
 async function loadSettings() {
-  const { data } = await sb.from('user_settings').select('currency').eq('user_id', currentUser.id).single();
-  if (data) userCurrency = data.currency;
+  try {
+    const data = await api.settings.get();
+    if (data?.currency) userCurrency = data.currency;
+  } catch {}
 }
 
 function openSettings() {
@@ -536,8 +544,9 @@ async function saveSettings() {
   showToast('Settings saved', 'success');
 
   // Sync in background
-  const { error } = await sb.from('user_settings').upsert({ user_id: currentUser.id, currency, updated_at: new Date().toISOString() });
-  if (error) {
+  try {
+    await api.settings.update({ currency });
+  } catch {
     userCurrency = prev;
     renderTransactions();
     updateStatsFrom(transactions);
@@ -571,17 +580,19 @@ async function loadTransactions(reset = false) {
   if (reset) { offset = 0; transactions = []; }
 
   const limit = activePeriod === 'recent' ? 5 : LIMIT;
-  let query = sb.from('transactions').select('*').order('created_at', { ascending: false });
-
   const { from, to } = getPeriodRange();
-  if (from) query = query.gte('created_at', from);
-  if (to)   query = query.lte('created_at', to);
-
-  if (activePeriod !== 'recent') query = query.range(offset, offset + limit - 1);
-  else query = query.limit(limit);
-
-  const { data, error } = await query;
-  if (error) { document.getElementById('tx-list').innerHTML = `<div class="empty-state"><p>Error loading transactions.</p></div>`; return; }
+  let data;
+  try {
+    data = await api.transactions.list({
+      limit,
+      offset: activePeriod !== 'recent' ? offset : undefined,
+      from: from || undefined,
+      to: to || undefined,
+    });
+  } catch {
+    document.getElementById('tx-list').innerHTML = `<div class="empty-state"><p>Error loading transactions.</p></div>`;
+    return;
+  }
   transactions = reset ? data : [...transactions, ...data];
   if (activePeriod !== 'recent') offset += data.length;
   document.getElementById('load-more-btn').style.display =
@@ -642,9 +653,18 @@ function updateStatsFrom(txns) {
 
 // Full reload from DB (used on init and load-more)
 async function loadStats() {
-  const { data } = await sb.from('transactions').select('amount, type');
-  if (!data) return;
-  updateStatsFrom(data);
+  try {
+    const rows = await api.transactions.stats();
+    // rows is [{type, total, count}, ...]
+    let expenses = 0, income = 0, count = 0;
+    rows.forEach(r => {
+      if (r.type === 'expense') { expenses = r.total; count += r.count; }
+      if (r.type === 'income')  { income  = r.total; count += r.count; }
+    });
+    document.getElementById('stat-expense').textContent = fmt(expenses);
+    document.getElementById('stat-income').textContent  = fmt(income);
+    document.getElementById('stat-count').textContent   = count;
+  } catch {}
 }
 
 // ── Add transaction (optimistic) ─────────────────────────────
@@ -659,25 +679,23 @@ async function addTransaction() {
   input.value = '';
   input.focus();
   const tempId = 'temp-' + Date.now();
-  const optimistic = { id: tempId, user_id: currentUser.id, created_at: new Date().toISOString(), ...parsed, _pending: true };
+  const optimistic = { id: tempId, created_at: new Date().toISOString(), ...parsed, _pending: true };
   transactions.unshift(optimistic);
   if (transactions.length > LIMIT) transactions.pop();
   renderTransactions();
   updateStatsFrom(transactions);
 
   // Sync in background
-  const { data, error } = await sb.from('transactions')
-    .insert([{ user_id: currentUser.id, ...parsed }]).select().single();
-
-  if (error) {
-    // Roll back
+  let data;
+  try {
+    data = await api.transactions.create(parsed);
+  } catch {
     transactions = transactions.filter(t => t.id !== tempId);
     renderTransactions();
     updateStatsFrom(transactions);
     return showToast('Failed to save — rolled back', 'error');
   }
 
-  // Replace temp with real record
   const idx = transactions.findIndex(t => t.id === tempId);
   if (idx !== -1) transactions[idx] = data;
   renderTransactions();
@@ -738,11 +756,9 @@ async function saveEdit() {
   showToast('Transaction updated', 'success');
 
   // Sync in background
-  const { error } = await sb.from('transactions')
-    .update(updates).eq('id', savedId);
-
-  if (error) {
-    // Roll back
+  try {
+    await api.transactions.update(savedId, updates);
+  } catch {
     if (idx !== -1 && original) transactions[idx] = original;
     renderTransactions();
     updateStatsFrom(transactions);
@@ -752,7 +768,7 @@ async function saveEdit() {
 
 // ── Delete (optimistic) ──────────────────────────────────────
 let delId;
-async function deleteTx(id) {  
+async function deleteTx(id) {
   delId = id;
   const deleteOverlay = document.getElementById('delete-overlay');
   deleteOverlay.classList.add('open');
@@ -760,20 +776,21 @@ async function deleteTx(id) {
 
 async function confirmDelete(){
   // Optimistic: remove from UI instantly, keep snapshot for rollback
-    const snapshot = [...transactions];
+  const snapshot = [...transactions];
     transactions = transactions.filter(t => t.id != delId);
+  renderTransactions();
+  updateStatsFrom(transactions);
+  showToast('Deleted', 'success');
+
+  // Sync in background
+  try {
+    await api.transactions.remove(id);
+  } catch {
+    transactions = snapshot;
     renderTransactions();
     updateStatsFrom(transactions);
-    showToast('Deleted', 'success');
-
-    // Sync in background
-    const { error } = await sb.from('transactions').delete().eq('id', delId);
-    if (error) {
-      transactions = snapshot;
-      renderTransactions();
-      updateStatsFrom(transactions);
-      showToast('Delete failed — rolled back', 'error');
-    }
+    showToast('Delete failed — rolled back', 'error');
+  }
     delId = undefined;
     const deleteOverlay = document.getElementById('delete-overlay');
     deleteOverlay.classList.remove('open');
@@ -794,8 +811,7 @@ function showToast(msg, type = 'success') {
 }
 
 async function logout() {
-  await sb.auth.signOut();
-  window.location.replace('../login/');
+  api.auth.logout();
 }
 
 // ── Import ────────────────────────────────────────────────────
@@ -868,8 +884,9 @@ async function handleImport(input) {
     let done = 0;
     for (let i = 0; i < records.length; i += BATCH) {
       const batch = records.slice(i, i + BATCH);
-      const { error } = await sb.from('transactions').insert(batch);
-      if (error) { showToast('Import failed on batch', 'error'); break; }
+      try {
+        for (const tx of batch) await api.transactions.create(tx);
+      } catch { showToast('Import failed on batch', 'error'); break; }
       done += batch.length;
       const pct = Math.round((done / records.length) * 100);
       fill.style.width = pct + '%';
@@ -891,10 +908,11 @@ async function exportData() {
   showToast('Preparing export…', 'success');
 
   // Fetch ALL transactions for export (ignore current period filter)
-  const { data, error } = await sb.from('transactions')
-    .select('*').order('created_at', { ascending: false });
-
-  if (error || !data?.length) return showToast('No data to export', 'error');
+  let data;
+  try {
+    data = await api.transactions.list({ limit: 10000 });
+  } catch { return showToast('No data to export', 'error'); }
+  if (!data?.length) return showToast('No data to export', 'error');
 
   const rows = data.map(t => ({
     Date:     new Date(t.created_at).toLocaleDateString(),

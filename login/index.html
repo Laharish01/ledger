@@ -1,62 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/ledger/theme.js"></script>
-<script>
-  // If already logged in, go straight to app
-</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Ledger — Sign In</title>
 <link rel="icon" type="image/x-icon" href="/ledger/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="/ledger/config.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="theme.js"></script>
 <style>
   :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --border: #1e1e2e;
-    --accent: #c8f560;
-    --accent-text: #0a0a0f;
-    --accent2: #7c6af7;
-    --text: #e8e8f0;
-    --muted: #5a5a7a;
-    --danger: #ff5f6d;
-    --success: #4ade80;
-    --grid-line: rgba(200,245,96,0.03);
-    --orb-opacity: 0.15;
+    --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
+    --accent: #c8f560; --accent-text: #0a0a0f; --accent2: #7c6af7;
+    --text: #e8e8f0; --muted: #5a5a7a; --danger: #ff5f6d; --success: #4ade80;
+    --grid-line: rgba(200,245,96,0.03); --orb-opacity: 0.15;
   }
-
   [data-theme="light"] {
-    --bg: #f5f5f0;
-    --surface: #ffffff;
-    --border: #e0e0d8;
-    --accent: #5a8a00;
-    --accent-text: #ffffff;
-    --accent2: #5b4fcf;
-    --text: #1a1a24;
-    --muted: #8a8a9a;
-    --danger: #d93025;
-    --success: #1e7e34;
-    --grid-line: rgba(90,138,0,0.06);
-    --orb-opacity: 0.08;
+    --bg: #f5f5f0; --surface: #ffffff; --border: #e0e0d8;
+    --accent: #5a8a00; --accent-text: #ffffff; --accent2: #5b4fcf;
+    --text: #1a1a24; --muted: #8a8a9a; --danger: #d93025; --success: #1e7e34;
+    --grid-line: rgba(90,138,0,0.06); --orb-opacity: 0.08;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Roboto', sans-serif;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    overflow-x: hidden;
-    transition: background 0.3s, color 0.3s;
+    background: var(--bg); color: var(--text);
+    font-family: 'Roboto', sans-serif; min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    overflow-x: hidden; transition: background 0.3s, color 0.3s;
   }
 
   .grid-bg {
@@ -64,131 +39,110 @@
     background-image:
       linear-gradient(var(--grid-line) 1px, transparent 1px),
       linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 40px 40px;
-    pointer-events: none;
+    background-size: 40px 40px; pointer-events: none;
   }
 
-  .orb {
-    position: fixed; width: 600px; height: 600px;
-    border-radius: 50%; filter: blur(120px);
-    pointer-events: none; opacity: var(--orb-opacity);
-    transition: opacity 0.3s;
-  }
+  .orb { position: fixed; width: 600px; height: 600px; border-radius: 50%; filter: blur(120px); pointer-events: none; opacity: var(--orb-opacity); }
   .orb-1 { background: var(--accent); top: -200px; right: -200px; }
   .orb-2 { background: var(--accent2); bottom: -200px; left: -200px; }
 
-  /* Theme toggle — top right corner */
   .theme-btn {
     position: fixed; top: 16px; right: 20px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: 8px; width: 36px; height: 36px;
-    font-size: 1rem; cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; width: 36px; height: 36px; font-size: 1rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
     z-index: 200; transition: all 0.2s; color: var(--text);
   }
   .theme-btn:hover { border-color: var(--accent); }
 
-  .auth-container {
-    position: relative; z-index: 1;
-    width: 100%; max-width: 420px; padding: 20px;
-  }
+  .auth-container { position: relative; z-index: 1; width: 100%; max-width: 440px; padding: 20px; }
 
   .brand { text-align: center; margin-bottom: 40px; }
-  .brand h1 {
-    font-family: 'Roboto Slab', serif;
-    font-size: 3rem; color: var(--accent);
-    letter-spacing: -1px; line-height: 1;
-  }
-  .brand p {
-    color: var(--muted); font-size: 0.75rem;
-    letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px;
-  }
+  .brand h1 { font-family: 'Roboto Slab', serif; font-size: 3rem; color: var(--accent); letter-spacing: -1px; line-height: 1; }
+  .brand p { color: var(--muted); font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase; margin-top: 6px; }
 
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 16px; padding: 32px;
-    transition: background 0.3s, border-color 0.3s;
-  }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 32px; transition: background 0.3s, border-color 0.3s; }
 
-  .tab-bar {
-    display: flex; gap: 4px;
-    background: var(--bg); border-radius: 8px;
-    padding: 4px; margin-bottom: 28px;
-    transition: background 0.3s;
-  }
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
 
-  .tab {
-    flex: 1; padding: 8px;
-    background: none; border: none;
+  /* Account ID display */
+  .account-id-box {
+    background: var(--bg); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px; margin-bottom: 20px;
+    text-align: center;
+  }
+  .account-id-label { font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .account-id-value {
+    font-family: 'Roboto', monospace; font-size: 1.05rem; font-weight: 500;
+    color: var(--accent); letter-spacing: 0.04em; word-break: break-all;
+    line-height: 1.5;
+  }
+  .copy-btn {
+    margin-top: 10px; padding: 6px 14px; background: none;
+    border: 1px solid var(--border); border-radius: 6px;
     color: var(--muted); font-family: 'Roboto', sans-serif;
-    font-size: 0.8rem; letter-spacing: 0.05em;
-    cursor: pointer; border-radius: 6px;
-    transition: all 0.2s; text-transform: uppercase;
+    font-size: 0.72rem; cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.05em; text-transform: uppercase;
   }
-  .tab.active { background: var(--accent); color: var(--accent-text); font-weight: 500; }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+  .warning-box {
+    background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.3);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 20px;
+    font-size: 0.78rem; color: #fb923c; line-height: 1.5;
+  }
+  .warning-box strong { display: block; margin-bottom: 2px; }
+
+  /* Input */
   .form-group { margin-bottom: 16px; }
-
-  label {
-    display: block; font-size: 0.7rem;
-    letter-spacing: 0.1em; text-transform: uppercase;
-    color: var(--muted); margin-bottom: 6px;
-  }
+  label { display: block; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
 
   input {
-    width: 100%; background: var(--bg);
-    border: 1px solid var(--border); border-radius: 8px;
-    padding: 12px 14px; color: var(--text);
-    font-family: 'Roboto', sans-serif; font-size: 16px;
+    width: 100%; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; color: var(--text);
+    font-family: 'Roboto', monospace; font-size: 16px;
     outline: none; transition: border-color 0.2s, background 0.3s;
+    letter-spacing: 0.02em;
   }
-  input:focus {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(200,245,96,0.08);
-  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,245,96,0.08); }
+  input::placeholder { font-family: 'Roboto', sans-serif; letter-spacing: 0; color: var(--muted); }
 
   .btn {
-    width: 100%; padding: 13px;
-    background: var(--accent); color: var(--accent-text);
-    border: none; border-radius: 8px;
-    font-family: 'Roboto', sans-serif;
-    font-size: 0.85rem; font-weight: 500;
-    letter-spacing: 0.05em; cursor: pointer;
-    margin-top: 8px; transition: all 0.2s;
-    text-transform: uppercase;
+    width: 100%; padding: 13px; background: var(--accent); color: var(--accent-text);
+    border: none; border-radius: 8px; font-family: 'Roboto', sans-serif;
+    font-size: 0.85rem; font-weight: 500; letter-spacing: 0.05em;
+    cursor: pointer; margin-top: 8px; transition: all 0.2s; text-transform: uppercase;
   }
   .btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(200,245,96,0.2); }
   .btn:active { transform: translateY(0); }
   .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-  .msg {
-    padding: 10px 14px; border-radius: 8px;
-    font-size: 0.8rem; margin-bottom: 16px; display: none;
+  .btn.secondary {
+    background: none; border: 1px solid var(--border); color: var(--muted);
+    box-shadow: none;
   }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); transform: none; box-shadow: none; }
+
+  .msg { padding: 10px 14px; border-radius: 8px; font-size: 0.8rem; margin-bottom: 16px; display: none; }
   .msg.show { display: block; }
-  .msg.error { background: rgba(255,95,109,0.1); border: 1px solid rgba(255,95,109,0.3); color: var(--danger); }
-  .msg.success { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.3); color: var(--success); }
+  .msg.error   { background: rgba(255,95,109,0.1);  border: 1px solid rgba(255,95,109,0.3);  color: var(--danger); }
+  .msg.success { background: rgba(74,222,128,0.1);  border: 1px solid rgba(74,222,128,0.3);  color: var(--success); }
 
-  .panel { display: none; }
-  .panel.active { display: block; }
+  .divider { text-align: center; color: var(--muted); font-size: 0.75rem; margin: 20px 0; position: relative; }
+  .divider::before, .divider::after { content: ''; position: absolute; top: 50%; width: 42%; height: 1px; background: var(--border); }
+  .divider::before { left: 0; }
+  .divider::after { right: 0; }
 
-  @media (max-width: 480px) {
-    .card { padding: 24px 20px; }
-    .brand h1 { font-size: 2.5rem; }
-  }
-
-  @media (max-width: 768px) {
-    input, select, textarea { font-size: 16px !important; }
-  }
+  @media (max-width: 480px) { .card { padding: 24px 20px; } .brand h1 { font-size: 2.5rem; } }
+  @media (max-width: 768px) { input, select, textarea { font-size: 16px !important; } }
 </style>
 </head>
 <body>
 <div class="grid-bg"></div>
 <div class="orb orb-1"></div>
 <div class="orb orb-2"></div>
-
-<button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">☀</button>
+<button class="theme-btn" onclick="toggleTheme()">☀</button>
 
 <div class="auth-container">
   <div class="brand">
@@ -197,53 +151,68 @@
   </div>
 
   <div class="card">
-    <div class="tab-bar">
-      <button class="tab active" onclick="switchTab('login')">Login</button>
-      <button class="tab" onclick="switchTab('register')">Register</button>
-    </div>
-
     <div id="msg" class="msg"></div>
 
-    <div id="login-panel" class="panel active">
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email">
-      </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password">
-      </div>
-      <button class="btn" id="login-btn" onclick="login()">Sign In</button>
+    <!-- ── Home panel: two choices ── -->
+    <div id="home-panel" class="panel active">
+      <button class="btn" onclick="showPanel('create')" style="margin-top:0">Create New Account</button>
+      <div class="divider">or</div>
+      <button class="btn secondary" onclick="showPanel('login')">Sign In with Account ID</button>
     </div>
 
-    <div id="register-panel" class="panel">
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
+    <!-- ── Create panel: show generated ID ── -->
+    <div id="create-panel" class="panel">
+      <div class="account-id-box">
+        <div class="account-id-label">Your Account ID</div>
+        <div class="account-id-value" id="new-account-id">Generating…</div>
+        <button class="copy-btn" onclick="copyId()">Copy ID</button>
       </div>
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" id="reg-password" placeholder="Min. 6 characters" autocomplete="new-password">
+      <div class="warning-box">
+        <strong>⚠ Save this ID somewhere safe.</strong>
+        This is the only way to access your account. It cannot be recovered if lost.
       </div>
-      <button class="btn" id="reg-btn" onclick="register()">Create Account</button>
+      <button class="btn" id="create-btn" onclick="createAccount()">Create Account & Sign In</button>
+      <button class="btn secondary" onclick="showPanel('home')" style="margin-top:8px">Back</button>
+    </div>
+
+    <!-- ── Login panel: paste ID ── -->
+    <div id="login-panel" class="panel">
+      <div class="form-group">
+        <label>Account ID</label>
+        <input type="text" id="login-id" placeholder="xxxx-xxxx-xxxx" autocomplete="off" spellcheck="false">
+      </div>
+      <button class="btn" id="login-btn" onclick="login()">Sign In</button>
+      <button class="btn secondary" onclick="showPanel('home')" style="margin-top:8px">Back</button>
     </div>
   </div>
 </div>
 
 <script>
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+if (api.auth.isLoggedIn()) window.location.replace('../app/');
 
-sb.auth.getSession().then(({ data }) => {
-  if (data.session) window.location.replace('../app/');
-});
+let generatedId = null;
 
-function switchTab(tab) {
-  document.querySelectorAll('.tab').forEach((t, i) =>
-    t.classList.toggle('active', (i === 0 && tab === 'login') || (i === 1 && tab === 'register'))
-  );
-  document.getElementById('login-panel').classList.toggle('active', tab === 'login');
-  document.getElementById('register-panel').classList.toggle('active', tab === 'register');
+function showPanel(name) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById(name + '-panel').classList.add('active');
   showMsg('');
+  if (name === 'create') {
+    const seg = () => String(Math.floor(1000 + Math.random() * 9000));
+    generatedId = `${seg()}-${seg()}-${seg()}`;
+    document.getElementById('new-account-id').textContent = generatedId;
+  }
+  if (name === 'login') {
+    setTimeout(() => document.getElementById('login-id').focus(), 50);
+  }
+}
+
+function copyId() {
+  if (!generatedId) return;
+  navigator.clipboard.writeText(generatedId).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy ID', 2000);
+  });
 }
 
 function showMsg(text, type = 'error') {
@@ -252,37 +221,36 @@ function showMsg(text, type = 'error') {
   el.className = `msg${text ? ' show ' + type : ''}`;
 }
 
-function setLoading(btnId, loading) {
-  document.getElementById(btnId).disabled = loading;
+async function createAccount() {
+  const btn = document.getElementById('create-btn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    await api.auth.create();
+    window.location.replace('../app/');
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Create Account & Sign In';
+    showMsg(e.message || 'Failed to create account');
+  }
 }
 
 async function login() {
-  const email = document.getElementById('login-email').value.trim();
-  const password = document.getElementById('login-password').value;
-  if (!email || !password) return showMsg('Please fill all fields');
-  setLoading('login-btn', true);
-  const { error } = await sb.auth.signInWithPassword({ email, password });
-  setLoading('login-btn', false);
-  if (error) return showMsg(error.message);
-  window.location.replace('../app/');
-}
-
-async function register() {
-  const email = document.getElementById('reg-email').value.trim();
-  const password = document.getElementById('reg-password').value;
-  if (!email || !password) return showMsg('Please fill all fields');
-  if (password.length < 6) return showMsg('Password must be at least 6 characters');
-  setLoading('reg-btn', true);
-  const { error } = await sb.auth.signUp({ email, password });
-  setLoading('reg-btn', false);
-  if (error) return showMsg(error.message);
-  showMsg('Account created! Check your email to confirm, then sign in.', 'success');
+  const raw = document.getElementById('login-id').value.trim();
+  if (!raw) return showMsg('Please enter your Account ID');
+  const btn = document.getElementById('login-btn');
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    await api.auth.login(raw);
+    window.location.replace('../app/');
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Sign In';
+    showMsg('Account ID not found or invalid');
+  }
 }
 
 document.addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
   if (document.getElementById('login-panel').classList.contains('active')) login();
-  else register();
+  if (document.getElementById('create-panel').classList.contains('active')) createAccount();
 });
 </script>
 </body>
