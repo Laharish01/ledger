@@ -1,11 +1,6 @@
-# If you edit config.js locally with real keys for testing,
-# uncomment the line below so you never accidentally commit them.
-# Re-comment it before pushing if you want to update the placeholder.
-
-# config.js
-ledger-worker
-
+node_modules/
+dist/
+.env.local
+.env
 .wrangler
-# OS files
-.DS_Store
-Thumbs.db
+ledger-worker
