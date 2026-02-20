@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="/ledger/theme.js"></script>
 <script>
   (async () => {
     const stored = Object.keys(localStorage).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
@@ -14,9 +13,10 @@
 <link rel="icon" type="image/x-icon" href="/ledger/favicon.ico">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&family=Roboto+Slab:wght@400;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="/ledger/config.js"></script>
+<script src="config.js"></script>
+<script src="api.js"></script>
+<script src="theme.js"></script>
 <style>
   :root {
     --bg: #0a0a0f; --surface: #111118; --border: #1e1e2e;
@@ -142,7 +142,6 @@
 </main>
 
 <script>
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 let userCurrency = 'USD';
 
 const COLORS = ['#c8f560','#7c6af7','#ff5f6d','#4ade80','#fb923c',
@@ -171,15 +170,12 @@ function chartDefaults() {
 }
 
 async function init() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) return window.location.replace('../login/');
-
-  // Load currency setting
-  const { data: settings } = await sb.from('user_settings').select('currency').eq('user_id', session.user.id).single();
-  if (settings?.currency) userCurrency = settings.currency;
-
+  if (!api.auth.isLoggedIn()) return window.location.replace('../login/');
+  try {
+    const s = await api.settings.get();
+    if (s?.currency) userCurrency = s.currency;
+  } catch {}
   loadAnalytics();
-
   const searchInput = document.getElementById('search-input');
   searchInput.addEventListener('blur', (e) => {
     if (searchQ == e.target.value) return;
@@ -191,15 +187,9 @@ async function init() {
 let searchQ;
 
 async function loadAnalytics(searchq) {
-  let data, error;
-  if (searchq) {
-    ({ data, error } = await sb.from('transactions').select('amount, type, category, created_at').textSearch('notes', `${searchq}`).order('created_at', { ascending: true }));
-  }else {
-    ({ data, error } = await sb.from('transactions').select('amount, type, category, created_at').order('created_at', { ascending: true }));
-  }
-  
-
-  if (error || !data?.length) {
+  let data;
+  try { data = await api.transactions.list({ limit: 10000 }); } catch {}
+  if (!data?.length) {
     document.getElementById('content').innerHTML = `
       <div class="empty-analytics">
         <div class="big">📈</div>
@@ -327,10 +317,7 @@ function renderCharts({ byCategory, months, monthMap, totalExpense, totalIncome 
   }
 }
 
-async function logout() {
-  await sb.auth.signOut();
-  window.location.replace('../login/');
-}
+function logout() { api.auth.logout(); }
 
 init();
 </script>
