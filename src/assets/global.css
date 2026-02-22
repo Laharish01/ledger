@@ -22,9 +22,10 @@ body {
   font-family: 'Roboto', sans-serif;
   min-height: 100vh;
   transition: background 0.3s, color 0.3s;
+  /* Prevent horizontal scroll on mobile */
+  overflow-x: hidden;
 }
 
-/* Grid background */
 .grid-bg {
   position: fixed; inset: 0;
   background-image:
@@ -35,10 +36,10 @@ body {
   z-index: 0;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
+/* Prevent iOS Safari auto-zoom on input focus */
 @media (max-width: 768px) {
   input, select, textarea { font-size: 16px !important; }
 }
