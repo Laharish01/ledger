@@ -2,11 +2,12 @@
   <div>
     <div class="grid-bg"></div>
 
-    <NavBar
-      :account-id="auth.accountId"
-      @logout="logout"
-      @open-settings="showSettings = true"
-    />
+    <NavBar :account-id="auth.accountId" @logout="logout">
+      <template #actions>
+        <ImportExport @toast="showToast" @done="onImportDone" />
+        <button class="icon-btn" @click="showSettings = true" title="Settings">⚙</button>
+      </template>
+    </NavBar>
 
     <main>
       <TransactionInput @submit="handleAdd" />
@@ -19,7 +20,7 @@
         :tx-list="txStore.txList"
         :has-more="txStore.hasMore"
         @edit="openEdit"
-        @delete="openDelete"
+        @delete="handleDelete"
         @load-more="txStore.loadMore()"
       />
     </main>
@@ -30,13 +31,7 @@
       @save="handleEditSave"
     />
 
-    <SettingsModal
-      v-model="showSettings"
-      @saved="showToast({ msg: 'Settings saved', type: 'success' })"
-      @toast="showToast"
-      @import-done="onImportDone"
-    />
-    <DeleteModal v-model="showDelete" :transaction="deleteId"></DeleteModal>
+    <SettingsModal v-model="showSettings" @saved="showToast({ msg: 'Settings saved', type: 'success' })" />
 
     <Toast ref="toast" />
   </div>
@@ -49,26 +44,25 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { useTransactionStore, parseInput } from '../stores/transactions'
 
-import NavBar           from '../components/NavBar.vue'
+import NavBar          from '../components/NavBar.vue'
 import TransactionInput from '../components/TransactionInput.vue'
-import StatsGrid        from '../components/StatsGrid.vue'
-import PeriodFilter     from '../components/PeriodFilter.vue'
-import TransactionList  from '../components/TransactionList.vue'
-import EditModal        from '../components/EditModal.vue'
-import SettingsModal    from '../components/SettingsModal.vue'
-import Toast            from '../components/Toast.vue'
+import StatsGrid       from '../components/StatsGrid.vue'
+import PeriodFilter    from '../components/PeriodFilter.vue'
+import TransactionList from '../components/TransactionList.vue'
+import EditModal       from '../components/EditModal.vue'
+import SettingsModal   from '../components/SettingsModal.vue'
+import ImportExport    from '../components/ImportExport.vue'
+import Toast           from '../components/Toast.vue'
 
 const router   = useRouter()
 const auth     = useAuthStore()
 const settings = useSettingsStore()
 const txStore  = useTransactionStore()
 
-const toast        = ref(null)
-const showEdit     = ref(false)
+const toast       = ref(null)
+const showEdit    = ref(false)
 const showSettings = ref(false)
 const editingId   = ref(null)
-const deleteId = ref(null)
-const showDelete = ref(false)
 
 const editingTx = computed(() => txStore.txList.find(t => t.id == editingId.value) || null)
 
@@ -87,7 +81,7 @@ async function handleAdd(raw) {
     const data = await txStore.add(parsed)
     showToast({ msg: `Added: ${data.category} ${settings.fmt(data.amount)}`, type: 'success' })
     txStore.loadStats()
-  } catch {
+  } catch (e) {
     showToast({ msg: 'Failed to save — rolled back', type: 'error' })
   }
 }
@@ -95,11 +89,6 @@ async function handleAdd(raw) {
 function openEdit(id) {
   editingId.value = id
   showEdit.value  = true
-}
-
-function openDelete(id) {
-  showDelete.value = true;
-  deleteId.value = id;
 }
 
 async function handleEditSave(updates) {
@@ -139,11 +128,13 @@ onMounted(async () => {
 <style scoped>
 main {
   max-width: 760px; margin: 0 auto;
-  padding: 40px 20px 100px; /* extra bottom padding for mobile tab bar */
-  position: relative; z-index: 1;
+  padding: 40px 20px 80px; position: relative; z-index: 1;
 }
-
-@media (max-width: 640px) {
-  main { padding: 24px 14px 100px; }
+.icon-btn {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; width: 34px; height: 34px; font-size: 0.95rem;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; color: var(--text);
 }
+.icon-btn:hover { border-color: var(--accent); }
 </style>

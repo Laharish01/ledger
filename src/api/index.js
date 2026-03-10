@@ -33,8 +33,7 @@ async function apiFetch(path, options = {}) {
   })
 
   if (res.status === 401) {
-    clearSession()
-    window.location.href = '/ledger/login'
+    clearSession(); window.location.reload()
     return
   }
 

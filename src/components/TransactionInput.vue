@@ -1,65 +1,98 @@
+<!--
+  TransactionInput — freeform entry bar at the bottom of the Home tab.
+  Format: "<amount> <category> [notes…]"
+  Negative amount = income.
+  Emits: submit(rawString)
+-->
 <template>
-  <div class="input-section">
-    <div class="input-label">New Transaction</div>
-    <div class="input-wrapper">
-      <input
-        ref="inputEl"
-        class="main-input"
-        v-model="value"
-        type="text"
-        placeholder="50 Food Lunch at the cafe..."
-        autocomplete="off"
-        @keydown.enter="submit"
-      >
-      <button class="submit-btn" @click="submit" title="Add (Enter)">↵</button>
-    </div>
-    <div class="input-hint">
-      Format: <span>&lt;Amount&gt; &lt;Category&gt; &lt;Notes&gt;</span> —
-      Use <span>-50</span> for income · Press <span>Enter</span> to save
-    </div>
+  <div class="input-wrap" :class="{ focused }">
+    <input
+      ref="inputEl"
+      v-model="value"
+      class="tx-input"
+      type="text"
+      placeholder="50 Food Lunch at the café…"
+      autocomplete="off"
+      @keydown.enter="submit"
+      @focus="focused = true"
+      @blur="focused = false"
+    >
+    <button class="submit-btn" title="Add transaction" @click="submit">
+      <SvgIcon :svg="iconEnter" :size="16" />
+    </button>
   </div>
+  <p class="input-hint">
+    <span class="hl">Amount</span>&nbsp;Category&nbsp;
+    <span class="dim">Notes (optional)</span>
+    &nbsp;·&nbsp;use&nbsp;<span class="hl">-50</span>&nbsp;for income
+  </p>
 </template>
 
 <script setup>
 import { ref } from 'vue'
+import SvgIcon from './SvgIcon.vue'
+import { iconEnter } from '../icons'
 
-const emit  = defineEmits(['submit'])
-const value = ref('')
+const emit    = defineEmits(['submit'])
+const value   = ref('')
 const inputEl = ref(null)
+const focused = ref(false)
 
 function submit() {
-  const v = value.value.trim()
-  if (!v) return
-  emit('submit', v)
+  const trimmed = value.value.trim()
+  if (!trimmed) return
+  emit('submit', trimmed)
   value.value = ''
   inputEl.value?.focus()
 }
 </script>
 
 <style scoped>
-.input-section { margin-bottom: 40px; }
-.input-label   { font-size: 0.7rem; letter-spacing: 0.15em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-.input-wrapper { position: relative; }
-
-.main-input {
-  width: 100%; background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 20px 60px 20px 20px; color: var(--text);
-  font-family: 'Roboto', sans-serif; font-size: 1.1rem;
-  outline: none; transition: all 0.3s; caret-color: var(--accent);
+.input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color var(--transition);
 }
-.main-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,245,96,0.08); }
-.main-input::placeholder { color: var(--muted); font-size: 0.9rem; }
+.input-wrap.focused { border-color: var(--accent); }
+
+.tx-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  padding: 13px 16px;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.9rem;
+  caret-color: var(--accent);
+}
+.tx-input::placeholder { color: var(--text2); }
 
 .submit-btn {
-  position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
-  width: 36px; height: 36px; background: var(--accent); border: none;
-  border-radius: 8px; cursor: pointer; display: flex; align-items: center;
-  justify-content: center; transition: all 0.2s; color: var(--accent-text); font-size: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  min-height: 48px;
+  background: var(--accent);
+  border: none;
+  color: var(--accent-text);
+  cursor: pointer;
+  transition: opacity var(--transition);
+  flex-shrink: 0;
 }
-.submit-btn:hover { transform: translateY(-50%) scale(1.05); }
+.submit-btn:hover { opacity: 0.85; }
 
-.input-hint { font-size: 0.7rem; color: var(--muted); margin-top: 8px; }
-.input-hint span { color: var(--accent); }
-
-@media (max-width: 600px) { .main-input { font-size: 16px; } }
+.input-hint {
+  font-size: 0.67rem;
+  color: var(--text2);
+  padding: 0 2px;
+  margin-top: 5px;
+}
+.input-hint .hl  { color: var(--accent); }
+.input-hint .dim { color: var(--text2); opacity: 0.7; }
 </style>

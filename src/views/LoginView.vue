@@ -46,7 +46,7 @@
             <input
               v-model="loginId"
               type="text"
-              placeholder="xxxx-xxxx-xxxx-xxxx"
+              placeholder="xxxx-xxxx-xxxx"
               autocomplete="off"
               spellcheck="false"
               @keydown.enter="login"
@@ -83,7 +83,7 @@ function showMsg(text, type = 'error') { msg.value = text; msgType.value = type 
 
 function showCreate() {
   const seg = () => String(Math.floor(1000 + Math.random() * 9000))
-  generatedId.value = `${seg()}-${seg()}-${seg()}-${seg()}`
+  generatedId.value = `${seg()}-${seg()}-${seg()}`
   panel.value = 'create'
   msg.value   = ''
 }

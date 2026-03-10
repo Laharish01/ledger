@@ -2,8 +2,7 @@
   <div>
     <div class="grid-bg"></div>
 
-    <NavBar :account-id="auth.accountId" @logout="logout" @open-settings="showSettings = true" />
-    <SettingsModal v-model="showSettings" @toast="() => {}" />
+    <NavBar :account-id="auth.accountId" @logout="logout" />
 
     <main>
       <div class="page-title">Analytics</div>
@@ -68,7 +67,6 @@ import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
 import { transactions as txApi } from '../api'
 import NavBar from '../components/NavBar.vue'
-import SettingsModal from '../components/SettingsModal.vue'
 import { storeToRefs } from 'pinia'
 
 const router   = useRouter()
@@ -76,8 +74,7 @@ const auth     = useAuthStore()
 const settings = useSettingsStore()
 const { fmt }  = storeToRefs(settings)
 
-const loading     = ref(true)
-const showSettings = ref(false)
+const loading  = ref(true)
 const data     = ref([])
 
 const COLORS = ['#c8f560','#7c6af7','#ff5f6d','#4ade80','#fb923c','#38bdf8','#e879f9','#fbbf24','#34d399','#f87171']
@@ -208,12 +205,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-main { max-width: 900px; margin: 0 auto; padding: 40px 20px 100px; position: relative; z-index: 1; }
-
-@media (max-width: 640px) {
-  main { padding: 24px 14px 100px; }
-  .summary-grid { grid-template-columns: 1fr 1fr; }
-}
+main { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; position: relative; z-index: 1; }
 .page-title { font-family: 'Roboto Slab', serif; font-size: 2rem; margin-bottom: 32px; }
 
 .summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 32px; }
