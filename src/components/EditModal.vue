@@ -35,11 +35,15 @@
             </div>
             <div class="field full">
               <label for="edit-date">Date</label>
-              <input id="edit-date" v-model="datePart" type="date">
+              <div class="input-clip">
+                <input id="edit-date" v-model="datePart" type="date">
+              </div>
             </div>
             <div class="field full">
               <label for="edit-time">Time</label>
-              <input id="edit-time" v-model="timePart" type="time">
+              <div class="input-clip">
+                <input id="edit-time" v-model="timePart" type="time">
+              </div>
             </div>
             <div class="field full">
               <label for="edit-notes">Notes</label>
@@ -283,6 +287,23 @@ input:focus { border-color: var(--accent); }
   transition: opacity var(--transition);
 }
 .btn-primary:hover { opacity: 0.88; }
+
+/* ── Date/Time clip container ───────────────────────────── */
+/* iOS ignores max-width on date/time inputs directly.
+   Wrapping in overflow:hidden forces the clip at the container level. */
+.input-clip {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+.input-clip input {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
 
 /* ── Transition ──────────────────────────────────────────── */
 .modal-enter-active, .modal-leave-active { transition: all 0.22s ease; }
