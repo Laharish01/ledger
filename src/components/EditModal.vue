@@ -34,15 +34,19 @@
               <input id="edit-category" v-model="category" type="text" placeholder="Food">
             </div>
             <div class="field full">
-              <label for="edit-date">Date</label>
-              <div class="input-clip">
-                <input id="edit-date" v-model="datePart" type="date">
-              </div>
-            </div>
-            <div class="field full">
-              <label for="edit-time">Time</label>
-              <div class="input-clip">
-                <input id="edit-time" v-model="timePart" type="time">
+              <div class="datetime-row">
+                <div class="datetime-col">
+                  <label for="edit-date">Date</label>
+                  <div class="input-clip">
+                    <input id="edit-date" v-model="datePart" type="date">
+                  </div>
+                </div>
+                <div class="datetime-col">
+                  <label for="edit-time">Time</label>
+                  <div class="input-clip">
+                    <input id="edit-time" v-model="timePart" type="time">
+                  </div>
+                </div>
               </div>
             </div>
             <div class="field full">
@@ -303,6 +307,18 @@ input:focus { border-color: var(--accent); }
   max-width: 100%;
   -webkit-appearance: none;
   appearance: none;
+}
+
+.datetime-row {
+  display: flex;
+  gap: 10px;
+}
+.datetime-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 /* ── Transition ──────────────────────────────────────────── */
