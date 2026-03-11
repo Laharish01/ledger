@@ -221,10 +221,6 @@
           <SvgIcon :svg="iconChart" :size="18" />
           <span class="mobile-tab-label">Analytics</span>
         </button>
-        <button class="mobile-tab" @click="showSettings = true">
-          <SvgIcon :svg="iconSettings" :size="18" />
-          <span class="mobile-tab-label">Settings</span>
-        </button>
         <button class="mobile-tab logout-tab" @click="logout">
           <SvgIcon :svg="iconLogout" :size="18" />
           <span class="mobile-tab-label">Sign out</span>
@@ -487,11 +483,11 @@ onMounted(async () => {
 /* ── Login page ─────────────────────────────────────────────────────────────── */
 
 .login-page {
-  min-height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  padding: 20px;
   position: relative;
   overflow: hidden;
 }
@@ -527,7 +523,7 @@ onMounted(async () => {
   z-index: 1;
 }
 
-.login-brand { text-align: center; margin-bottom: 32px; }
+.login-brand { text-align: center; margin-bottom: 20px; }
 .login-logo {
   width: 52px;
   height: 52px;

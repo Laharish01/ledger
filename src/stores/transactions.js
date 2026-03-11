@@ -14,7 +14,8 @@ import { transactions as txApi } from '../api'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const PAGE_SIZE = 20
+const PAGE_SIZE    = 20  // paginated periods
+const RECENT_LIMIT = 5   // "recent" tab shows latest 5 only
 
 const PALETTE = [
   '#b8f735', '#7c6af7', '#f7525a', '#3dd68c', '#fb923c',
@@ -154,20 +155,21 @@ export const useTransactionStore = defineStore('transactions', () => {
    */
   async function load(reset = false) {
     if (reset) { offset.value = 0; txList.value = [] }
-    const limit = activePeriod.value === 'recent' ? 5 : PAGE_SIZE
 
     const { from, to } = getPeriodRange()
+    const isRecent = activePeriod.value === 'recent'
+    const limit    = isRecent ? RECENT_LIMIT : PAGE_SIZE
 
     const data = await txApi.list({
-      limit:  limit,
+      limit,
       offset: reset ? 0 : offset.value,
-      from:   from  ?? undefined,
-      to:     to    ?? undefined,
+      from:   from ?? undefined,
+      to:     to   ?? undefined,
     })
 
-    txList.value = reset ? data : [...txList.value, ...data]
+    txList.value  = reset ? data : [...txList.value, ...data]
     offset.value += data.length
-    hasMore.value = data.length === PAGE_SIZE
+    hasMore.value = !isRecent && data.length === PAGE_SIZE
     return data
   }
 
