@@ -33,11 +33,11 @@
               <label for="edit-category">Category</label>
               <input id="edit-category" v-model="category" type="text" placeholder="Food">
             </div>
-            <div class="field">
+            <div class="field full">
               <label for="edit-date">Date</label>
               <input id="edit-date" v-model="datePart" type="date">
             </div>
-            <div class="field">
+            <div class="field full">
               <label for="edit-time">Time</label>
               <input id="edit-time" v-model="timePart" type="time">
             </div>
