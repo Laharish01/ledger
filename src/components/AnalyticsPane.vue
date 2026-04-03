@@ -1,81 +1,195 @@
 <!--
-  AnalyticsPane — charts tab content.
-  Reads from txStore.allTx (already loaded on login) — no extra API call.
-  Re-renders charts when allTx or currency changes.
+  AnalyticsPane — full analytics view.
+
+  Sections (top → bottom):
+  1. Time range tabs  — This month / 3M / 6M / Year / All
+  2. Hero stat row    — Income | Expenses | Net (with spend-ratio bar)
+  3. Insights strip   — biggest category, top expense, MoM change
+  4. Spending by category — horizontal bar chart + category search
+  5. Income by source — breakdown by payment source tag
+  6. Cash flow        — line chart scoped to selected range
 -->
 <template>
   <div class="analytics">
+
+    <!-- Empty state -->
     <div v-if="!allTx.length" class="state-empty">
       <div class="empty-icon"><SvgIcon :svg="iconChart" :size="36" /></div>
       <p>Add transactions to see analytics</p>
     </div>
+
     <template v-else>
-      <div class="summary-grid">
-        <div class="sum-card">
-          <div class="sum-label">Total expenses</div>
-          <div class="sum-value red">{{ fmt(totalExpense) }}</div>
+
+      <!-- ── 1. Time range tabs ──────────────────────────────── -->
+      <div class="range-tabs">
+        <button
+          v-for="r in RANGES"
+          :key="r.key"
+          class="range-tab"
+          :class="{ active: range === r.key }"
+          @click="range = r.key"
+        >{{ r.label }}</button>
+      </div>
+
+      <!-- ── 2. Hero stats ──────────────────────────────────── -->
+      <div class="hero-grid">
+        <div class="hero-card income-card">
+          <div class="hero-label">Income</div>
+          <div class="hero-value">{{ fmt(totalIncome) }}</div>
         </div>
-        <div class="sum-card">
-          <div class="sum-label">Total income</div>
-          <div class="sum-value green">{{ fmt(totalIncome) }}</div>
+        <div class="hero-card expense-card">
+          <div class="hero-label">Expenses</div>
+          <div class="hero-value">{{ fmt(totalExpense) }}</div>
+          <!-- spend ratio bar -->
+          <div class="ratio-track" title="Expenses as % of income">
+            <div
+              class="ratio-fill"
+              :style="{ width: Math.min(spendRatio, 100) + '%' }"
+              :class="{ overspent: spendRatio > 100 }"
+            />
+          </div>
+          <div class="ratio-label">{{ spendRatio.toFixed(0) }}% of income</div>
         </div>
-        <div class="sum-card span2">
-          <div class="sum-label">Net balance</div>
-          <div class="sum-value" :class="net >= 0 ? 'green' : 'red'">{{ fmt(net) }}</div>
+        <div class="hero-card net-card" :class="net >= 0 ? 'positive' : 'negative'">
+          <div class="hero-label">Net</div>
+          <div class="hero-value">{{ fmt(Math.abs(net)) }}</div>
+          <div class="net-dir">{{ net >= 0 ? '↑ surplus' : '↓ deficit' }}</div>
         </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-label">Spending by category</div>
-        <div class="chart-wrap"><canvas ref="pieCanvas" /></div>
-        <div class="legend">
-          <div v-for="(c, i) in topCats" :key="c.category" class="leg-item">
-            <div class="leg-dot" :style="{ background: COLORS[i] }" />
-            <span class="leg-name">{{ c.category }}</span>
-            <span class="leg-amt">{{ fmt(c.total) }}</span>
-            <span class="leg-pct">{{ ((c.total / totalExpense) * 100).toFixed(0) }}%</span>
+      <!-- ── 3. Insights strip ──────────────────────────────── -->
+      <div v-if="insights.length" class="insights-strip">
+        <div v-for="ins in insights" :key="ins.label" class="insight-chip">
+          <span class="ins-label">{{ ins.label }}</span>
+          <span class="ins-value">{{ ins.value }}</span>
+        </div>
+      </div>
+
+      <!-- ── 4. Spending by category ────────────────────────── -->
+      <div class="section-card">
+        <div class="section-header">
+          <span class="section-title">Spending by category</span>
+          <div class="search-wrap">
+            <SvgIcon :svg="iconSearch" :size="13" class="search-icon" />
+            <input
+              v-model="catSearch"
+              class="cat-search"
+              type="text"
+              placeholder="Search…"
+              autocomplete="off"
+            >
+          </div>
+        </div>
+
+        <div v-if="filteredCats.length" class="cat-list">
+          <div
+            v-for="(c, i) in filteredCats"
+            :key="c.category"
+            class="cat-row"
+            :class="{ dimmed: catSearch && !c.category.toLowerCase().includes(catSearch.toLowerCase()) }"
+          >
+            <div class="cat-dot" :style="{ background: COLORS[i % COLORS.length] }" />
+            <span class="cat-name">{{ c.category }}</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                :style="{ width: ((c.total / topCats[0].total) * 100) + '%', background: COLORS[i % COLORS.length] }"
+              />
+            </div>
+            <span class="cat-pct">{{ ((c.total / totalExpense) * 100).toFixed(0) }}%</span>
+            <span class="cat-amt">{{ fmt(c.total) }}</span>
+          </div>
+        </div>
+        <p v-else class="no-results">No categories match "{{ catSearch }}"</p>
+      </div>
+
+      <!-- ── 5. Income by source ────────────────────────────── -->
+      <div v-if="sourcesStore.list.length && incomeBySource.length" class="section-card">
+        <div class="section-title" style="margin-bottom:12px">Income by source</div>
+        <div class="source-breakdown">
+          <div v-for="row in incomeBySource" :key="row.name" class="source-row">
+            <div class="source-dot" :style="{ background: row.color }" />
+            <span class="source-name">{{ row.name }}</span>
+            <div class="bar-track">
+              <div
+                class="bar-fill"
+                :style="{ width: ((row.total / incomeBySource[0].total) * 100) + '%', background: row.color }"
+              />
+            </div>
+            <span class="source-amt">{{ fmt(row.total) }}</span>
           </div>
         </div>
       </div>
 
-      <div class="chart-card">
-        <div class="chart-label">Monthly trend</div>
-        <div class="chart-wrap tall"><canvas ref="lineCanvas" /></div>
+      <!-- ── 6. Cash flow chart ─────────────────────────────── -->
+      <div class="section-card">
+        <div class="section-title" style="margin-bottom:16px">Cash flow</div>
+        <div class="chart-wrap"><canvas ref="lineCanvas" /></div>
       </div>
+
     </template>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { Chart } from 'chart.js/auto'
 import { storeToRefs } from 'pinia'
-import { useSettingsStore }     from '../stores/settings'
-import { useTransactionStore }  from '../stores/transactions'
-import SvgIcon                  from './SvgIcon.vue'
-import { iconChart }            from '../icons'
+import { useSettingsStore }    from '../stores/settings'
+import { useTransactionStore } from '../stores/transactions'
+import { useSourcesStore }     from '../stores/sources'
+import SvgIcon   from './SvgIcon.vue'
+import { iconChart, iconSearch } from '../icons'
 
 const props = defineProps({ currency: String })
 
-const settings  = useSettingsStore()
-const txStore   = useTransactionStore()
-const { fmt }   = storeToRefs(settings)
-const { allTx } = storeToRefs(txStore)
+const settings     = useSettingsStore()
+const txStore      = useTransactionStore()
+const sourcesStore = useSourcesStore()
+const { fmt }      = storeToRefs(settings)
+const { allTx }    = storeToRefs(txStore)
 
-// ── Chart colours ────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
 const COLORS = [
-  '#b8f735', '#7c6af7', '#f7525a', '#3dd68c', '#fb923c',
+  '#7c6af7', '#b8f735', '#f7525a', '#3dd68c', '#fb923c',
   '#38bdf8', '#e879f9', '#fbbf24', '#34d399', '#f87171',
 ]
 
-// ── Derived data (computed from allTx — zero API calls) ──────────────────────
+const RANGES = [
+  { key: '1M',  label: '1M'   },
+  { key: '3M',  label: '3M'   },
+  { key: '6M',  label: '6M'   },
+  { key: '1Y',  label: '1Y'   },
+  { key: 'all', label: 'All'  },
+]
 
-const expenses     = computed(() => allTx.value.filter(t => t.type === 'expense'))
-const incomes      = computed(() => allTx.value.filter(t => t.type === 'income'))
+// ── State ────────────────────────────────────────────────────────────────────
+
+const range     = ref('1M')
+const catSearch = ref('')
+
+// ── Filtered dataset for selected range ──────────────────────────────────────
+
+const rangedTx = computed(() => {
+  if (range.value === 'all') return allTx.value
+  const months = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }[range.value]
+  const cutoff = new Date()
+  cutoff.setMonth(cutoff.getMonth() - months)
+  cutoff.setDate(1)
+  cutoff.setHours(0, 0, 0, 0)
+  return allTx.value.filter(t => new Date(t.created_at) >= cutoff)
+})
+
+const expenses = computed(() => rangedTx.value.filter(t => t.type === 'expense'))
+const incomes  = computed(() => rangedTx.value.filter(t => t.type === 'income'))
+
 const totalExpense = computed(() => expenses.value.reduce((s, t) => s + parseFloat(t.amount), 0))
 const totalIncome  = computed(() => incomes.value.reduce((s, t) => s + parseFloat(t.amount), 0))
 const net          = computed(() => totalIncome.value - totalExpense.value)
+const spendRatio   = computed(() => totalIncome.value > 0 ? (totalExpense.value / totalIncome.value) * 100 : 0)
+
+// ── Category breakdown ────────────────────────────────────────────────────────
 
 const topCats = computed(() => {
   const map = {}
@@ -83,33 +197,69 @@ const topCats = computed(() => {
   return Object.entries(map)
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total)
-    .slice(0, 10)
 })
 
-const monthMap = computed(() => {
-  const map     = {}
-  const cutoff  = new Date()
-  cutoff.setMonth(cutoff.getMonth() - 5)
-  cutoff.setDate(1)
-
-  allTx.value
-    .filter(t => new Date(t.created_at) >= cutoff)
-    .forEach(t => {
-      const key = new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
-      if (!map[key]) map[key] = { expense: 0, income: 0 }
-      map[key][t.type] += parseFloat(t.amount)
-    })
-
-  return map
+const filteredCats = computed(() => {
+  if (!catSearch.value) return topCats.value
+  const q = catSearch.value.toLowerCase()
+  return topCats.value.filter(c => c.category.toLowerCase().includes(q))
 })
 
-// ── Chart rendering ──────────────────────────────────────────────────────────
+// ── Income by source ──────────────────────────────────────────────────────────
 
-const pieCanvas  = ref(null)
+const incomeBySource = computed(() => {
+  const map = {}
+  incomes.value.forEach(t => {
+    const src = sourcesStore.fromNotes(t.notes)
+    if (!src) return
+    if (!map[src.name]) map[src.name] = { name: src.name, color: src.color, total: 0 }
+    map[src.name].total += parseFloat(t.amount)
+  })
+  return Object.values(map).sort((a, b) => b.total - a.total)
+})
+
+// ── Insights ──────────────────────────────────────────────────────────────────
+
+const insights = computed(() => {
+  const out = []
+
+  // Biggest spending category
+  if (topCats.value.length) {
+    const top = topCats.value[0]
+    out.push({ label: 'Top category', value: `${top.category} · ${fmt.value(top.total)}` })
+  }
+
+  // Single largest expense
+  if (expenses.value.length) {
+    const biggest = expenses.value.reduce((a, b) => parseFloat(a.amount) > parseFloat(b.amount) ? a : b)
+    out.push({ label: 'Biggest expense', value: `${biggest.category} · ${fmt.value(biggest.amount)}` })
+  }
+
+  // Month-on-month expense change (only meaningful for ranges ≥ 2 months)
+  if (range.value !== '1M') {
+    const now   = new Date()
+    const mStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const pStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const thisM  = allTx.value.filter(t => t.type === 'expense' && new Date(t.created_at) >= mStart)
+    const prevM  = allTx.value.filter(t => t.type === 'expense' && new Date(t.created_at) >= pStart && new Date(t.created_at) < mStart)
+    const tTotal = thisM.reduce((s, t) => s + parseFloat(t.amount), 0)
+    const pTotal = prevM.reduce((s, t) => s + parseFloat(t.amount), 0)
+    if (pTotal > 0) {
+      const pct = ((tTotal - pTotal) / pTotal * 100).toFixed(0)
+      const dir = tTotal >= pTotal ? '↑' : '↓'
+      out.push({ label: 'vs last month', value: `${dir} ${Math.abs(pct)}%` })
+    }
+  }
+
+  return out
+})
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+
 const lineCanvas = ref(null)
-let charts = []
+let lineChart    = null
 
-function getThemeColors() {
+function getTheme() {
   const light = document.documentElement.getAttribute('data-theme') === 'light'
   return {
     muted:     light ? '#9898b0' : '#5a5a7a',
@@ -119,113 +269,68 @@ function getThemeColors() {
   }
 }
 
-function destroyCharts() {
-  charts.forEach(c => c.destroy())
-  charts = []
-}
-
-async function renderCharts() {
+async function renderChart() {
   await nextTick()
-  destroyCharts()
+  if (!lineCanvas.value) return
 
-  const tc  = getThemeColors()
+  if (lineChart) { lineChart.destroy(); lineChart = null }
+
+  // Build month buckets for the selected range
+  const buckets = {}
+  rangedTx.value.forEach(t => {
+    const key = new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
+    if (!buckets[key]) buckets[key] = { expense: 0, income: 0 }
+    buckets[key][t.type] += parseFloat(t.amount)
+  })
+
+  const months = Object.keys(buckets)
+  if (!months.length) return
+
+  const tc  = getTheme()
   const tip = {
-    backgroundColor: tc.tip,
-    borderColor:     tc.tipBorder,
-    borderWidth:     1,
-    titleColor:      tc.muted,
-    bodyColor:       tc.muted,
-    padding:         10,
-    cornerRadius:    8,
+    backgroundColor: tc.tip, borderColor: tc.tipBorder, borderWidth: 1,
+    titleColor: tc.muted, bodyColor: tc.muted, padding: 10, cornerRadius: 8,
   }
 
   Chart.defaults.color       = tc.muted
   Chart.defaults.font.family = "'Inter', sans-serif"
   Chart.defaults.font.size   = 11
 
-  // Doughnut — spending by category
-  if (pieCanvas.value && topCats.value.length) {
-    charts.push(new Chart(pieCanvas.value, {
-      type: 'doughnut',
-      data: {
-        labels:   topCats.value.map(c => c.category),
-        datasets: [{
-          data:            topCats.value.map(c => c.total),
-          backgroundColor: COLORS.slice(0, topCats.value.length),
-          borderWidth:     0,
-          hoverOffset:     6,
-        }],
-      },
-      options: {
-        responsive:          true,
-        maintainAspectRatio: false,
-        cutout:              '70%',
-        plugins: {
-          legend: { display: false },
-          tooltip: { ...tip, callbacks: { label: ctx => ` ${ctx.label}: ${fmt.value(ctx.raw)}` } },
+  lineChart = new Chart(lineCanvas.value, {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        {
+          label: 'Expenses', data: months.map(m => buckets[m]?.expense ?? 0),
+          borderColor: '#f7525a', backgroundColor: 'rgba(247,82,90,0.08)',
+          fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#f7525a',
         },
-      },
-    }))
-  }
-
-  // Line — monthly trend
-  const months = Object.keys(monthMap.value)
-  if (lineCanvas.value && months.length) {
-    charts.push(new Chart(lineCanvas.value, {
-      type: 'line',
-      data: {
-        labels:   months,
-        datasets: [
-          {
-            label:           'Expenses',
-            data:            months.map(m => monthMap.value[m]?.expense ?? 0),
-            borderColor:     '#f7525a',
-            backgroundColor: 'rgba(247,82,90,0.08)',
-            fill:            true,
-            tension:         0.4,
-            pointRadius:     3,
-            pointBackgroundColor: '#f7525a',
-          },
-          {
-            label:           'Income',
-            data:            months.map(m => monthMap.value[m]?.income ?? 0),
-            borderColor:     '#3dd68c',
-            backgroundColor: 'rgba(61,214,140,0.08)',
-            fill:            true,
-            tension:         0.4,
-            pointRadius:     3,
-            pointBackgroundColor: '#3dd68c',
-          },
-        ],
-      },
-      options: {
-        responsive:          true,
-        maintainAspectRatio: false,
-        interaction:         { mode: 'index', intersect: false },
-        plugins: {
-          legend: { labels: { color: tc.muted, usePointStyle: true, pointStyleWidth: 7, boxHeight: 7 } },
-          tooltip: { ...tip, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt.value(ctx.raw)}` } },
+        {
+          label: 'Income', data: months.map(m => buckets[m]?.income ?? 0),
+          borderColor: '#3dd68c', backgroundColor: 'rgba(61,214,140,0.08)',
+          fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#3dd68c',
         },
-        scales: {
-          x: { grid: { color: tc.grid }, ticks: { color: tc.muted } },
-          y: { grid: { color: tc.grid }, ticks: { color: tc.muted, callback: v => fmt.value(v) } },
-        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: tc.muted, usePointStyle: true, pointStyleWidth: 7, boxHeight: 7 } },
+        tooltip: { ...tip, callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt.value(ctx.raw)}` } },
       },
-    }))
-  }
+      scales: {
+        x: { grid: { color: tc.grid }, ticks: { color: tc.muted } },
+        y: { grid: { color: tc.grid }, ticks: { color: tc.muted, callback: v => fmt.value(v) } },
+      },
+    },
+  })
 }
 
-// Initial render — canvases only exist after mount
-onMounted(() => {
-  if (allTx.value.length) renderCharts()
-})
-
-// Re-render on data or currency changes after mount
-watch([allTx, () => props.currency], () => {
-  if (allTx.value.length) renderCharts()
-})
-
-onUnmounted(destroyCharts)
+onMounted(() => { if (allTx.value.length) renderChart() })
+watch([rangedTx, () => props.currency], () => { if (allTx.value.length) renderChart() })
+onUnmounted(() => { if (lineChart) lineChart.destroy() })
 </script>
 
 <style scoped>
@@ -234,29 +339,102 @@ onUnmounted(destroyCharts)
 .state-empty { padding: 60px 0; text-align: center; color: var(--text2); font-size: 0.85rem; }
 .empty-icon  { margin-bottom: 10px; color: var(--text2); }
 
-.summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sum-card {
+/* ── Range tabs ──────────────────────────────────────────────── */
+.range-tabs {
+  display: flex; gap: 4px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 4px;
+}
+.range-tab {
+  flex: 1; padding: 6px 0; border: none; border-radius: 7px;
+  background: none; font-family: 'Inter', sans-serif;
+  font-size: 0.75rem; font-weight: 500; color: var(--text2);
+  cursor: pointer; transition: background var(--transition), color var(--transition);
+}
+.range-tab.active { background: var(--surface2); color: var(--text); }
+
+/* ── Hero stats ──────────────────────────────────────────────── */
+.hero-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.hero-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 12px;
+}
+.hero-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); margin-bottom: 4px; }
+.hero-value { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+.income-card  .hero-value { color: var(--success); }
+.expense-card .hero-value { color: var(--danger); }
+.net-card.positive .hero-value { color: var(--success); }
+.net-card.negative .hero-value { color: var(--danger); }
+
+.ratio-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.ratio-fill  { height: 100%; background: var(--danger); border-radius: 2px; transition: width 0.4s ease; }
+.ratio-fill.overspent { background: #f7525a; }
+.ratio-label { font-size: 0.6rem; color: var(--text2); margin-top: 4px; }
+.net-dir     { font-size: 0.62rem; color: var(--text2); margin-top: 4px; }
+
+/* ── Insights ────────────────────────────────────────────────── */
+.insights-strip { display: flex; flex-direction: column; gap: 6px; }
+.insight-chip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 9px 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.ins-label { font-size: 0.7rem; color: var(--text2); }
+.ins-value { font-size: 0.75rem; font-weight: 500; color: var(--text); text-align: right; }
+
+/* ── Section cards ───────────────────────────────────────────── */
+.section-card {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px;
 }
-.sum-card.span2 { grid-column: 1 / -1; }
-.sum-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); margin-bottom: 5px; }
-.sum-value { font-family: 'Space Grotesk', sans-serif; font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
-.sum-value.red   { color: var(--danger); }
-.sum-value.green { color: var(--success); }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+.section-title  { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); }
 
-.chart-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px;
+/* Category search */
+.search-wrap {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 8px;
+  transition: border-color var(--transition);
 }
-.chart-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); margin-bottom: 16px; }
-.chart-wrap      { position: relative; height: 220px; }
-.chart-wrap.tall { height: 240px; }
+.search-wrap:focus-within { border-color: var(--accent); }
+.search-icon { color: var(--text2); flex-shrink: 0; }
+.cat-search {
+  background: none; border: none; outline: none;
+  font-family: 'Inter', sans-serif; font-size: 0.78rem;
+  color: var(--text); width: 90px;
+}
+.cat-search::placeholder { color: var(--text2); }
 
-.legend { margin-top: 16px; display: flex; flex-direction: column; gap: 7px; max-height: 180px; overflow-y: auto; }
-.leg-item { display: flex; align-items: center; gap: 8px; font-size: 0.75rem; }
-.leg-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.leg-name { flex: 1; color: var(--text2); }
-.leg-amt  { color: var(--text); font-weight: 500; }
-.leg-pct  { font-size: 0.65rem; color: var(--accent); background: var(--accent-dim); padding: 2px 6px; border-radius: 4px; }
+/* Category rows — horizontal bar */
+.cat-list { display: flex; flex-direction: column; gap: 9px; }
+.cat-row  { display: flex; align-items: center; gap: 8px; }
+.cat-row.dimmed { opacity: 0.35; }
+.cat-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cat-name { font-size: 0.75rem; color: var(--text); width: 80px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+.bar-fill  { height: 100%; border-radius: 3px; transition: width 0.4s ease; }
+.cat-pct  { font-size: 0.65rem; color: var(--text2); width: 28px; text-align: right; flex-shrink: 0; }
+.cat-amt  { font-size: 0.72rem; font-weight: 500; color: var(--text); width: 60px; text-align: right; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif; }
+
+.no-results { font-size: 0.78rem; color: var(--text2); padding: 12px 0; text-align: center; }
+
+/* Income by source */
+.source-breakdown { display: flex; flex-direction: column; gap: 9px; }
+.source-row  { display: flex; align-items: center; gap: 8px; }
+.source-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.source-name { font-size: 0.75rem; color: var(--text); width: 80px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-amt  { font-size: 0.72rem; font-weight: 500; color: var(--success); width: 60px; text-align: right; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif; }
+
+/* Cash flow chart */
+.chart-wrap { position: relative; height: 220px; }
+
+/* Mobile — shrink hero text */
+@media (max-width: 400px) {
+  .hero-grid { grid-template-columns: 1fr 1fr 1fr; }
+  .hero-value { font-size: 0.82rem; }
+  .cat-name, .source-name { width: 60px; }
+  .cat-amt,  .source-amt  { width: 50px; }
+}
 </style>

@@ -155,3 +155,12 @@ export const transactions = {
   update(id, payload) { return apiFetch(`/api/transactions/${id}`, { method: 'PUT',    body: JSON.stringify(payload) }) },
   remove(id)          { return apiFetch(`/api/transactions/${id}`, { method: 'DELETE' }) },
 }
+
+// ── Payment sources ───────────────────────────────────────────────────────────
+
+export const sources = {
+  list()             { return apiFetch('/api/sources') },
+  create(payload)    { return apiFetch('/api/sources',       { method: 'POST',   body: JSON.stringify(payload) }) },
+  update(id, payload){ return apiFetch(`/api/sources/${id}`, { method: 'PUT',    body: JSON.stringify(payload) }) },
+  remove(id)         { return apiFetch(`/api/sources/${id}`, { method: 'DELETE' }) },
+}

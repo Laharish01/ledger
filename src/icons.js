@@ -123,3 +123,15 @@ export const iconWarn = `<svg ${ATTRS}>
   <line x1="12" y1="9" x2="12" y2="13"/>
   <line x1="12" y1="17" x2="12.01" y2="17"/>
 </svg>`
+
+// Lucide — search
+export const iconSearch = `<svg ${ATTRS}>
+  <circle cx="11" cy="11" r="8"/>
+  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+</svg>`
+
+// Lucide — credit-card (for sources)
+export const iconCard = `<svg ${ATTRS}>
+  <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+  <line x1="1" y1="10" x2="23" y2="10"/>
+</svg>`

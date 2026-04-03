@@ -53,6 +53,12 @@
             </button>
           </div>
 
+          <div class="section-label">Accounts</div>
+          <button class="data-btn" @click="$emit('open-accounts')">
+            <SvgIcon :svg="iconCard" :size="15" />
+            Manage payment sources
+          </button>
+
           <!-- Import progress bar -->
           <div v-if="importing" class="progress-track">
             <div class="progress-fill" :style="{ width: importPct + '%' }" />
@@ -74,13 +80,13 @@
 import { ref, watch } from 'vue'
 import { useSettingsStore }      from '../stores/settings'
 import { transactions as txApi } from '../api'
-import { iconClose, iconUpload, iconDownload } from '../icons'
+import { iconClose, iconUpload, iconDownload, iconCard } from '../icons'
 import SvgIcon from './SvgIcon.vue'
 
 // ── Props / emits ────────────────────────────────────────────────────────────
 
 const props = defineProps({ modelValue: Boolean })
-const emit  = defineEmits(['update:modelValue', 'saved', 'toast', 'import-done'])
+const emit  = defineEmits(['update:modelValue', 'saved', 'toast', 'import-done', 'open-accounts'])
 
 // ── Currency ─────────────────────────────────────────────────────────────────
 

@@ -187,7 +187,7 @@
             </div>
 
             <!-- Fixed input bar -->
-            <div class="input-area">
+            <div class="input-area" :style="{ transform: `translateY(-${inputBarOffset}px)` }">
               <div class="input-inner">
                 <TransactionInput @submit="handleAdd" />
               </div>
@@ -243,6 +243,7 @@
       v-model="showSettings"
       @toast="showToast"
       @import-done="onImportDone"
+      @open-accounts="showSettings = false; showAccounts = true"
     />
 
     <!-- Delete confirmation -->
@@ -272,15 +273,17 @@
       </Transition>
     </Teleport>
 
+    <AccountsModal v-model="showAccounts" />
     <Toast ref="toastRef" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 
 import { useAuthStore }        from './stores/auth'
+import { useSourcesStore }     from './stores/sources'
 import { useSettingsStore }    from './stores/settings'
 import { useTransactionStore, parseInput, timeAgo } from './stores/transactions'
 
@@ -291,6 +294,7 @@ import TransactionInput from './components/TransactionInput.vue'
 import EditModal        from './components/EditModal.vue'
 import SettingsModal    from './components/SettingsModal.vue'
 import AnalyticsPane    from './components/AnalyticsPane.vue'
+import AccountsModal   from './components/AccountsModal.vue'
 import Toast            from './components/Toast.vue'
 
 import {
@@ -300,7 +304,8 @@ import {
 
 // ── Stores ────────────────────────────────────────────────────────────────────
 
-const auth     = useAuthStore()
+const auth        = useAuthStore()
+const sourcesStore = useSourcesStore()
 const settings = useSettingsStore()
 const txStore  = useTransactionStore()
 const { fmt }  = storeToRefs(settings)
@@ -378,7 +383,7 @@ async function afterLogin() {
   await settings.load()
   // loadAll fetches all transactions for stats computation.
   // load(true) fetches the first page for the visible list.
-  await Promise.all([txStore.loadAll(), txStore.load(true)])
+  await Promise.all([txStore.loadAll(), txStore.load(true), sourcesStore.load()])
 }
 
 // ── App state ─────────────────────────────────────────────────────────────────
@@ -387,6 +392,7 @@ const activeTab      = ref('home')
 const toastRef       = ref(null)
 const showEdit       = ref(false)
 const showSettings   = ref(false)
+const showAccounts   = ref(false)
 const editingId      = ref(null)
 const deleteTarget   = ref(null)
 const listLoading    = ref(false)
@@ -470,10 +476,36 @@ function onImportDone() {
   txStore.load(true)
 }
 
+// ── iOS keyboard / visual viewport fix ───────────────────────────────────────
+//
+// On iOS Safari the visual viewport shrinks when the keyboard opens but
+// position:fixed elements stay anchored to the layout viewport, hiding them
+// under the keyboard. We read window.visualViewport.offsetTop and apply it
+// as a CSS custom property so the input bar can translate itself up.
+
+const inputBarOffset = ref(0)
+
+function onViewportResize() {
+  if (!window.visualViewport) return
+  // offsetTop = gap between visual and layout viewport tops (keyboard height proxy)
+  const keyboardH = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop
+  inputBarOffset.value = Math.max(0, keyboardH)
+}
+
+onMounted(() => {
+  window.visualViewport?.addEventListener('resize', onViewportResize)
+  window.visualViewport?.addEventListener('scroll', onViewportResize)
+})
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 onMounted(async () => {
   if (auth.loggedIn) await afterLogin()
+})
+
+onUnmounted(() => {
+  window.visualViewport?.removeEventListener('resize', onViewportResize)
+  window.visualViewport?.removeEventListener('scroll', onViewportResize)
 })
 </script>
 
