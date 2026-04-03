@@ -104,12 +104,18 @@
       </div>
 
       <!-- ── 5. Income by source ────────────────────────────── -->
-      <div v-if="sourcesStore.list.length && incomeBySource.length" class="section-card">
-        <div class="section-title" style="margin-bottom:12px">Income by source</div>
+      <div v-if="incomeBySource.length" class="section-card">
+        <div class="section-header">
+          <span class="section-title">Income by source</span>
+          <span class="section-sub">{{ incomeBySource.length }} source{{ incomeBySource.length > 1 ? 's' : '' }}</span>
+        </div>
         <div class="source-breakdown">
-          <div v-for="row in incomeBySource" :key="row.name" class="source-row">
+          <div v-for="row in incomeBySource" :key="row.id" class="source-row">
             <div class="source-dot" :style="{ background: row.color }" />
-            <span class="source-name">{{ row.name }}</span>
+            <div class="source-info">
+              <span class="source-name">{{ row.name }}</span>
+              <span class="source-type-label">{{ row.type }} · {{ row.count }} tx</span>
+            </div>
             <div class="bar-track">
               <div
                 class="bar-fill"
@@ -118,6 +124,9 @@
             </div>
             <span class="source-amt">{{ fmt(row.total) }}</span>
           </div>
+        </div>
+        <div v-if="sourcesStore.list.length && !incomeBySource.length" class="no-source-hint">
+          Tag income transactions with a source to see breakdown here
         </div>
       </div>
 
@@ -210,10 +219,12 @@ const filteredCats = computed(() => {
 const incomeBySource = computed(() => {
   const map = {}
   incomes.value.forEach(t => {
-    const src = sourcesStore.fromNotes(t.notes)
+    if (!t.source_id) return
+    const src = sourcesStore.list.find(s => s.id === t.source_id)
     if (!src) return
-    if (!map[src.name]) map[src.name] = { name: src.name, color: src.color, total: 0 }
-    map[src.name].total += parseFloat(t.amount)
+    if (!map[src.id]) map[src.id] = { id: src.id, name: src.name, color: src.color, type: src.type, total: 0, count: 0 }
+    map[src.id].total += parseFloat(t.amount)
+    map[src.id].count++
   })
   return Object.values(map).sort((a, b) => b.total - a.total)
 })
@@ -424,8 +435,12 @@ onUnmounted(() => { if (lineChart) lineChart.destroy() })
 .source-breakdown { display: flex; flex-direction: column; gap: 9px; }
 .source-row  { display: flex; align-items: center; gap: 8px; }
 .source-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.source-name { font-size: 0.75rem; color: var(--text); width: 80px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-info { display: flex; flex-direction: column; width: 90px; flex-shrink: 0; min-width: 0; }
+.source-name { font-size: 0.75rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-type-label { font-size: 0.6rem; color: var(--text2); text-transform: capitalize; margin-top: 1px; }
 .source-amt  { font-size: 0.72rem; font-weight: 500; color: var(--success); width: 60px; text-align: right; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif; }
+.section-sub { font-size: 0.65rem; color: var(--text2); }
+.no-source-hint { font-size: 0.72rem; color: var(--text2); text-align: center; padding: 8px 0; }
 
 /* Cash flow chart */
 .chart-wrap { position: relative; height: 220px; }

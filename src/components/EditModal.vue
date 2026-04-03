@@ -24,6 +24,26 @@
             <button class="type-btn income"  :class="{ active: txType === 'income'  }" @click="txType = 'income'">Income</button>
           </div>
 
+          <!-- Source selector — income only -->
+          <Transition name="slide">
+            <div v-if="txType === 'income' && sources.list.length" class="field-group">
+              <label>Source</label>
+              <div class="source-chips">
+                <button
+                  v-for="src in sources.list"
+                  :key="src.id"
+                  class="source-chip"
+                  :class="{ active: sourceId === src.id }"
+                  :style="sourceId === src.id ? { borderColor: src.color, color: src.color } : {}"
+                  @click="sourceId = sourceId === src.id ? null : src.id"
+                >
+                  <span class="chip-dot" :style="{ background: src.color }" />
+                  {{ src.name }}
+                </button>
+              </div>
+            </div>
+          </Transition>
+
           <div class="fields">
             <div class="field">
               <label for="edit-amount">Amount</label>
@@ -68,14 +88,16 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import SvgIcon        from './SvgIcon.vue'
+import SvgIcon          from './SvgIcon.vue'
+import { useSourcesStore } from '../stores/sources'
 import { iconClose }  from '../icons'
 
 const props = defineProps({
   modelValue:  { type: Boolean, required: true },
   transaction: { type: Object, default: null },
 })
-const emit = defineEmits(['update:modelValue', 'save'])
+const emit    = defineEmits(['update:modelValue', 'save'])
+const sources = useSourcesStore()
 
 const txType   = ref('expense')
 const amount   = ref('')
@@ -83,6 +105,7 @@ const category = ref('')
 const notes    = ref('')
 const datePart = ref('')
 const timePart = ref('')
+const sourceId = ref(null)
 
 watch(() => props.transaction, (tx) => {
   if (!tx) return
@@ -94,6 +117,7 @@ watch(() => props.transaction, (tx) => {
   const pad   = n => String(n).padStart(2, '0')
   datePart.value = `${local.getFullYear()}-${pad(local.getMonth() + 1)}-${pad(local.getDate())}`
   timePart.value = `${pad(local.getHours())}:${pad(local.getMinutes())}`
+  sourceId.value = tx.source_id ?? null
 }, { immediate: true })
 
 function save() {
@@ -104,6 +128,7 @@ function save() {
     category:   category.value.trim(),
     notes:      notes.value.trim(),
     created_at: new Date(`${datePart.value}T${timePart.value || '00:00'}`).toISOString(),
+    source_id:  txType.value === 'income' ? sourceId.value : null,
   })
   emit('update:modelValue', false)
 }
@@ -320,6 +345,27 @@ input:focus { border-color: var(--accent); }
   flex-direction: column;
   gap: 5px;
 }
+/* ── Source chips ────────────────────────────────────────── */
+.field-group { display: flex; flex-direction: column; gap: 6px; }
+.field-group label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text2);
+}
+.source-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.source-chip {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 11px; border-radius: 20px;
+  border: 1px solid var(--border); background: var(--surface2);
+  font-family: 'Inter', sans-serif; font-size: 0.73rem;
+  color: var(--text2); cursor: pointer; transition: border-color 0.15s, color 0.15s;
+}
+.source-chip:hover { border-color: var(--border2); color: var(--text); }
+.chip-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+.slide-enter-active, .slide-leave-active { transition: all 0.18s ease; }
+.slide-enter-from, .slide-leave-to { opacity: 0; transform: translateY(-4px); }
 
 /* ── Transition ──────────────────────────────────────────── */
 .modal-enter-active, .modal-leave-active { transition: all 0.22s ease; }

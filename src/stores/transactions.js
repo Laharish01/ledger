@@ -191,6 +191,7 @@ export const useTransactionStore = defineStore('transactions', () => {
     const optimistic = {
       id:         tempId,
       created_at: new Date().toISOString(),
+      source_id:  null,
       _pending:   true,
       ...parsed,
     }

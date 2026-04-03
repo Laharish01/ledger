@@ -17,7 +17,12 @@
         <span class="tx-cat">{{ tx.category }}</span>
         <span v-if="tx.notes" class="tx-notes">{{ tx.notes }}</span>
       </div>
-      <time class="tx-date" :datetime="tx.created_at">{{ timeAgo(tx.created_at) }}</time>
+      <div class="tx-meta">
+        <time class="tx-date" :datetime="tx.created_at">{{ timeAgo(tx.created_at) }}</time>
+        <span v-if="txSource" class="tx-source" :style="{ color: txSource.color }">
+          {{ txSource.name }}
+        </span>
+      </div>
     </div>
 
     <div class="tx-amount" :class="tx.type">
@@ -36,16 +41,25 @@
 </template>
 
 <script setup>
+import { computed }              from 'vue'
 import { storeToRefs }           from 'pinia'
 import { useSettingsStore }      from '../stores/settings'
+import { useSourcesStore }       from '../stores/sources'
 import { catColor, timeAgo }     from '../stores/transactions'
 import { iconEdit, iconTrash }   from '../icons'
 import SvgIcon                   from './SvgIcon.vue'
 
-defineProps({ tx: { type: Object, required: true } })
+const props = defineProps({ tx: { type: Object, required: true } })
 defineEmits(['edit', 'delete'])
 
 const { fmt } = storeToRefs(useSettingsStore())
+
+const sourcesStore = useSourcesStore()
+const txSource = computed(() =>
+  props.tx.source_id
+    ? sourcesStore.list.find(s => s.id === props.tx.source_id) ?? null
+    : null
+)
 </script>
 
 <style scoped>
@@ -89,11 +103,12 @@ const { fmt } = storeToRefs(useSettingsStore())
   text-overflow: ellipsis;
   max-width: 180px;
 }
-.tx-date {
-  display: block;
-  font-size: 0.65rem;
-  color: var(--text2);
-  margin-top: 2px;
+.tx-meta { display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+.tx-date { font-size: 0.65rem; color: var(--text2); }
+.tx-source {
+  font-size: 0.62rem;
+  font-weight: 500;
+  opacity: 0.85;
 }
 
 .tx-amount {

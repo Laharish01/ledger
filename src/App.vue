@@ -418,7 +418,7 @@ function copyAccountId() {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 
-async function handleAdd(raw) {
+async function handleAdd({ raw, sourceId }) {
   let parsed
   try {
     parsed = parseInput(raw)
@@ -426,6 +426,9 @@ async function handleAdd(raw) {
     showToast({ msg: e.message, type: 'error' })
     return
   }
+
+  // Attach source only for income transactions
+  if (parsed.type === 'income' && sourceId) parsed.source_id = sourceId
 
   try {
     const saved = await txStore.add(parsed)
