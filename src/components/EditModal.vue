@@ -24,9 +24,9 @@
             <button class="type-btn income"  :class="{ active: txType === 'income'  }" @click="txType = 'income'">Income</button>
           </div>
 
-          <!-- Source selector — income only -->
+          <!-- Source selector — all transaction types -->
           <Transition name="slide">
-            <div v-if="txType === 'income' && sources.list.length" class="field-group">
+            <div v-if="sources.list.length" class="field-group">
               <label>Source</label>
               <div class="source-chips">
                 <button
@@ -128,7 +128,7 @@ function save() {
     category:   category.value.trim(),
     notes:      notes.value.trim(),
     created_at: new Date(`${datePart.value}T${timePart.value || '00:00'}`).toISOString(),
-    source_id:  txType.value === 'income' ? sourceId.value : null,
+    source_id:  sourceId.value,
   })
   emit('update:modelValue', false)
 }

@@ -1,15 +1,15 @@
 <!--
   TransactionInput — freeform entry bar.
   Format: "<amount> <category> [notes…]"  Negative = income.
-  When the typed amount is negative, a source picker appears above the bar.
+  A source picker always appears when sources exist — for both income and expenses.
   Emits: submit({ raw, sourceId })
 -->
 <template>
   <div class="tx-input-root">
 
-    <!-- Source picker — only shown when amount looks like income -->
+    <!-- Source picker — shown whenever sources exist -->
     <Transition name="slide-down">
-      <div v-if="isIncome && sources.list.length" class="source-picker">
+      <div v-if="sources.list.length" class="source-picker">
         <span class="source-label">Source</span>
         <div class="source-chips">
           <button
@@ -54,7 +54,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import SvgIcon           from './SvgIcon.vue'
 import { iconEnter }     from '../icons'
 import { useSourcesStore } from '../stores/sources'
@@ -67,16 +67,10 @@ const inputEl          = ref(null)
 const focused          = ref(false)
 const selectedSourceId = ref(null)
 
-/** True when the first token in the input is a negative number. */
-const isIncome = computed(() => {
-  const first = value.value.trim().split(/\s+/)[0]
-  return first.startsWith('-') && !isNaN(parseFloat(first))
-})
-
 function submit() {
   const trimmed = value.value.trim()
   if (!trimmed) return
-  emit('submit', { raw: trimmed, sourceId: isIncome.value ? selectedSourceId.value : null })
+  emit('submit', { raw: trimmed, sourceId: selectedSourceId.value })
   value.value            = ''
   selectedSourceId.value = null
   inputEl.value?.focus()

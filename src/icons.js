@@ -135,3 +135,22 @@ export const iconCard = `<svg ${ATTRS}>
   <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
   <line x1="1" y1="10" x2="23" y2="10"/>
 </svg>`
+
+// Lucide — arrow-left
+export const iconArrowLeft = `<svg ${ATTRS}>
+  <line x1="19" y1="12" x2="5" y2="12"/>
+  <polyline points="12 19 5 12 12 5"/>
+</svg>`
+
+// Lucide — calendar
+export const iconCalendar = `<svg ${ATTRS}>
+  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+  <line x1="16" y1="2" x2="16" y2="6"/>
+  <line x1="8" y1="2" x2="8" y2="6"/>
+  <line x1="3" y1="10" x2="21" y2="10"/>
+</svg>`
+
+// Lucide — chevron-right
+export const iconChevronRight = `<svg ${ATTRS}>
+  <polyline points="9 18 15 12 9 6"/>
+</svg>`

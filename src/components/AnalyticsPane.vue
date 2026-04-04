@@ -1,16 +1,26 @@
 <!--
   AnalyticsPane — full analytics view.
+  When a source is selected, renders SourceDetail in place of all content.
 
-  Sections (top → bottom):
-  1. Time range tabs  — This month / 3M / 6M / Year / All
-  2. Hero stat row    — Income | Expenses | Net (with spend-ratio bar)
-  3. Insights strip   — biggest category, top expense, MoM change
-  4. Spending by category — horizontal bar chart + category search
-  5. Income by source — breakdown by payment source tag
-  6. Cash flow        — line chart scoped to selected range
+  Sections:
+  1. Time range tabs
+  2. Hero stat row — Income | Expenses | Net
+  3. Insights strip
+  4. Spending by category + search
+  5. By source — all sources with in/out/net, tap to open SourceDetail
+  6. Cash flow chart
 -->
 <template>
   <div class="analytics">
+
+    <!-- Source detail view — replaces all content when a source is selected -->
+    <SourceDetail
+      v-if="selectedSource"
+      :source="selectedSource"
+      @back="selectedSource = null"
+    />
+
+    <template v-else>
 
     <!-- Empty state -->
     <div v-if="!allTx.length" class="state-empty">
@@ -103,31 +113,34 @@
         <p v-else class="no-results">No categories match "{{ catSearch }}"</p>
       </div>
 
-      <!-- ── 5. Income by source ────────────────────────────── -->
-      <div v-if="incomeBySource.length" class="section-card">
+      <!-- ── 5. By source ─────────────────────────────────── -->
+      <div v-if="sourcesStore.list.length" class="section-card">
         <div class="section-header">
-          <span class="section-title">Income by source</span>
-          <span class="section-sub">{{ incomeBySource.length }} source{{ incomeBySource.length > 1 ? 's' : '' }}</span>
+          <span class="section-title">By source</span>
+          <span class="section-sub">tap to view detail</span>
         </div>
-        <div class="source-breakdown">
-          <div v-for="row in incomeBySource" :key="row.id" class="source-row">
+        <div v-if="bySource.length" class="source-breakdown">
+          <button
+            v-for="row in bySource"
+            :key="row.id"
+            class="source-row clickable"
+            @click="selectedSource = sourcesStore.list.find(s => s.id === row.id)"
+          >
             <div class="source-dot" :style="{ background: row.color }" />
             <div class="source-info">
               <span class="source-name">{{ row.name }}</span>
-              <span class="source-type-label">{{ row.type }} · {{ row.count }} tx</span>
+              <span class="source-type-label">{{ row.txCount }} transactions</span>
             </div>
-            <div class="bar-track">
-              <div
-                class="bar-fill"
-                :style="{ width: ((row.total / incomeBySource[0].total) * 100) + '%', background: row.color }"
-              />
+            <div class="source-stats">
+              <span class="source-out">−{{ fmt(row.totalOut) }}</span>
+              <span class="source-in">+{{ fmt(row.totalIn) }}</span>
             </div>
-            <span class="source-amt">{{ fmt(row.total) }}</span>
-          </div>
+            <SvgIcon :svg="iconChevronRight" :size="13" class="source-chevron" />
+          </button>
         </div>
-        <div v-if="sourcesStore.list.length && !incomeBySource.length" class="no-source-hint">
-          Tag income transactions with a source to see breakdown here
-        </div>
+        <p v-else class="no-source-hint">
+          Tag transactions with a source to see breakdown here
+        </p>
       </div>
 
       <!-- ── 6. Cash flow chart ─────────────────────────────── -->
@@ -137,6 +150,7 @@
       </div>
 
     </template>
+    </template><!-- end v-else -->
   </div>
 </template>
 
@@ -147,8 +161,9 @@ import { storeToRefs } from 'pinia'
 import { useSettingsStore }    from '../stores/settings'
 import { useTransactionStore } from '../stores/transactions'
 import { useSourcesStore }     from '../stores/sources'
-import SvgIcon   from './SvgIcon.vue'
-import { iconChart, iconSearch } from '../icons'
+import SvgIcon      from './SvgIcon.vue'
+import SourceDetail from './SourceDetail.vue'
+import { iconChart, iconSearch, iconChevronRight } from '../icons'
 
 const props = defineProps({ currency: String })
 
@@ -175,8 +190,9 @@ const RANGES = [
 
 // ── State ────────────────────────────────────────────────────────────────────
 
-const range     = ref('1M')
-const catSearch = ref('')
+const range          = ref('1M')
+const catSearch      = ref('')
+const selectedSource = ref(null)
 
 // ── Filtered dataset for selected range ──────────────────────────────────────
 
@@ -214,19 +230,23 @@ const filteredCats = computed(() => {
   return topCats.value.filter(c => c.category.toLowerCase().includes(q))
 })
 
-// ── Income by source ──────────────────────────────────────────────────────────
+// ── By source (all transaction types) ────────────────────────────────────────
 
-const incomeBySource = computed(() => {
+const bySource = computed(() => {
   const map = {}
-  incomes.value.forEach(t => {
+  rangedTx.value.forEach(t => {
     if (!t.source_id) return
     const src = sourcesStore.list.find(s => s.id === t.source_id)
     if (!src) return
-    if (!map[src.id]) map[src.id] = { id: src.id, name: src.name, color: src.color, type: src.type, total: 0, count: 0 }
-    map[src.id].total += parseFloat(t.amount)
-    map[src.id].count++
+    if (!map[src.id]) map[src.id] = {
+      id: src.id, name: src.name, color: src.color, type: src.type,
+      totalIn: 0, totalOut: 0, txCount: 0,
+    }
+    if (t.type === 'income')  map[src.id].totalIn  += parseFloat(t.amount)
+    if (t.type === 'expense') map[src.id].totalOut += parseFloat(t.amount)
+    map[src.id].txCount++
   })
-  return Object.values(map).sort((a, b) => b.total - a.total)
+  return Object.values(map).sort((a, b) => (b.totalIn + b.totalOut) - (a.totalIn + a.totalOut))
 })
 
 // ── Insights ──────────────────────────────────────────────────────────────────
@@ -435,12 +455,28 @@ onUnmounted(() => { if (lineChart) lineChart.destroy() })
 .source-breakdown { display: flex; flex-direction: column; gap: 9px; }
 .source-row  { display: flex; align-items: center; gap: 8px; }
 .source-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.source-info { display: flex; flex-direction: column; width: 90px; flex-shrink: 0; min-width: 0; }
-.source-name { font-size: 0.75rem; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.source-type-label { font-size: 0.6rem; color: var(--text2); text-transform: capitalize; margin-top: 1px; }
-.source-amt  { font-size: 0.72rem; font-weight: 500; color: var(--success); width: 60px; text-align: right; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif; }
-.section-sub { font-size: 0.65rem; color: var(--text2); }
-.no-source-hint { font-size: 0.72rem; color: var(--text2); text-align: center; padding: 8px 0; }
+.source-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.source-name { font-size: 0.78rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.source-type-label { font-size: 0.6rem; color: var(--text2); margin-top: 1px; }
+.source-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.source-out  { font-size: 0.7rem; font-weight: 500; color: var(--danger); font-family: 'Space Grotesk', sans-serif; }
+.source-in   { font-size: 0.7rem; font-weight: 500; color: var(--success); font-family: 'Space Grotesk', sans-serif; }
+.source-chevron { color: var(--text2); flex-shrink: 0; }
+.section-sub { font-size: 0.62rem; color: var(--text2); }
+.no-source-hint { font-size: 0.72rem; color: var(--text2); text-align: center; padding: 12px 0; }
+
+/* Clickable source row */
+.source-row.clickable {
+  width: 100%;
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--transition);
+  padding: 6px 4px;
+}
+.source-row.clickable:hover { background: var(--surface2); }
 
 /* Cash flow chart */
 .chart-wrap { position: relative; height: 220px; }
