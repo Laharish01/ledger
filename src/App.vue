@@ -427,8 +427,7 @@ async function handleAdd({ raw, sourceId }) {
     return
   }
 
-  // Attach source only for income transactions
-  if (parsed.type === 'income' && sourceId) parsed.source_id = sourceId
+  parsed.source_id = sourceId
 
   try {
     const saved = await txStore.add(parsed)
