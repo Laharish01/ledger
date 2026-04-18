@@ -1,19 +1,21 @@
 <!--
-  AnalyticsPane — full analytics view.
-  When a source is selected, renders SourceDetail in place of all content.
+  AnalyticsPane — revamped analytics with filter panel.
 
-  Sections:
-  1. Time range tabs
-  2. Hero stat row — Income | Expenses | Net
-  3. Insights strip
-  4. Spending by category + search
-  5. By source — all sources with in/out/net, tap to open SourceDetail
-  6. Cash flow chart
+  Layout:
+  ┌─ Filter bar (filter icon + active filter chips) ─────────────────┐
+  │  Filter panel (slides down): Period · Category · Payment method  │
+  ├─ Hero row: Income | Expenses | Net ───────────────────────────────┤
+  ├─ Insights strip ──────────────────────────────────────────────────┤
+  ├─ Spending by category (horizontal bars) ──────────────────────────┤
+  ├─ By source (tap → SourceDetail) ─────────────────────────────────┤
+  └─ Cash flow line chart ────────────────────────────────────────────┘
+
+  When a source is selected the entire pane is replaced by SourceDetail.
 -->
 <template>
   <div class="analytics">
 
-    <!-- Source detail view — replaces all content when a source is selected -->
+    <!-- ── Source detail (full-pane takeover) ──────────────── -->
     <SourceDetail
       v-if="selectedSource"
       :source="selectedSource"
@@ -22,148 +24,256 @@
 
     <template v-else>
 
-    <!-- Empty state -->
-    <div v-if="!allTx.length" class="state-empty">
-      <div class="empty-icon"><SvgIcon :svg="iconChart" :size="36" /></div>
-      <p>Add transactions to see analytics</p>
-    </div>
-
-    <template v-else>
-
-      <!-- ── 1. Time range tabs ──────────────────────────────── -->
-      <div class="range-tabs">
-        <button
-          v-for="r in RANGES"
-          :key="r.key"
-          class="range-tab"
-          :class="{ active: range === r.key }"
-          @click="range = r.key"
-        >{{ r.label }}</button>
+      <!-- ── Empty state ─────────────────────────────────────── -->
+      <div v-if="!allTx.length" class="state-empty">
+        <div class="empty-icon"><SvgIcon :svg="iconChart" :size="36" /></div>
+        <p>Add transactions to see analytics</p>
       </div>
 
-      <!-- ── 2. Hero stats ──────────────────────────────────── -->
-      <div class="hero-grid">
-        <div class="hero-card income-card">
-          <div class="hero-label">Income</div>
-          <div class="hero-value">{{ fmt(totalIncome) }}</div>
-        </div>
-        <div class="hero-card expense-card">
-          <div class="hero-label">Expenses</div>
-          <div class="hero-value">{{ fmt(totalExpense) }}</div>
-          <!-- spend ratio bar -->
-          <div class="ratio-track" title="Expenses as % of income">
-            <div
-              class="ratio-fill"
-              :style="{ width: Math.min(spendRatio, 100) + '%' }"
-              :class="{ overspent: spendRatio > 100 }"
-            />
-          </div>
-          <div class="ratio-label">{{ spendRatio.toFixed(0) }}% of income</div>
-        </div>
-        <div class="hero-card net-card" :class="net >= 0 ? 'positive' : 'negative'">
-          <div class="hero-label">Net</div>
-          <div class="hero-value">{{ fmt(Math.abs(net)) }}</div>
-          <div class="net-dir">{{ net >= 0 ? '↑ surplus' : '↓ deficit' }}</div>
-        </div>
-      </div>
+      <template v-else>
 
-      <!-- ── 3. Insights strip ──────────────────────────────── -->
-      <div v-if="insights.length" class="insights-strip">
-        <div v-for="ins in insights" :key="ins.label" class="insight-chip">
-          <span class="ins-label">{{ ins.label }}</span>
-          <span class="ins-value">{{ ins.value }}</span>
-        </div>
-      </div>
-
-      <!-- ── 4. Spending by category ────────────────────────── -->
-      <div class="section-card">
-        <div class="section-header">
-          <span class="section-title">Spending by category</span>
-          <div class="search-wrap">
-            <SvgIcon :svg="iconSearch" :size="13" class="search-icon" />
-            <input
-              v-model="catSearch"
-              class="cat-search"
-              type="text"
-              placeholder="Search…"
-              autocomplete="off"
-            >
-          </div>
-        </div>
-
-        <div v-if="filteredCats.length" class="cat-list">
-          <div
-            v-for="(c, i) in filteredCats"
-            :key="c.category"
-            class="cat-row"
-            :class="{ dimmed: catSearch && !c.category.toLowerCase().includes(catSearch.toLowerCase()) }"
+        <!-- ══ FILTER BAR ════════════════════════════════════════ -->
+        <div class="filter-bar">
+          <button
+            class="filter-toggle"
+            :class="{ active: filterOpen }"
+            @click="filterOpen = !filterOpen"
           >
-            <div class="cat-dot" :style="{ background: COLORS[i % COLORS.length] }" />
-            <span class="cat-name">{{ c.category }}</span>
-            <div class="bar-track">
+            <SvgIcon :svg="iconFilter" :size="14" />
+            <span>Filters</span>
+            <span v-if="activeFilterCount" class="filter-badge">{{ activeFilterCount }}</span>
+          </button>
+
+          <!-- Active filter chips (quick-remove) -->
+          <div class="active-chips">
+            <button v-if="filters.range !== 'all'" class="chip active-chip" @click="filters.range = 'all'">
+              {{ RANGES.find(r => r.key === filters.range)?.label }}
+              <SvgIcon :svg="iconClose" :size="10" />
+            </button>
+            <button
+              v-for="cat in filters.categories"
+              :key="cat"
+              class="chip active-chip"
+              @click="toggleCategory(cat)"
+            >
+              {{ cat }}<SvgIcon :svg="iconClose" :size="10" />
+            </button>
+            <button
+              v-for="sid in filters.sources"
+              :key="sid"
+              class="chip active-chip"
+              @click="toggleSource(sid)"
+            >
+              {{ sourcesStore.list.find(s => s.id === sid)?.name }}
+              <SvgIcon :svg="iconClose" :size="10" />
+            </button>
+            <button v-if="activeFilterCount" class="chip clear-chip" @click="clearFilters">
+              Clear all
+            </button>
+          </div>
+        </div>
+
+        <!-- ══ FILTER PANEL ══════════════════════════════════════ -->
+        <Transition name="panel">
+          <div v-if="filterOpen" class="filter-panel">
+
+            <!-- Period -->
+            <div class="fp-section">
+              <div class="fp-label">Time period</div>
+              <div class="fp-pills">
+                <button
+                  v-for="r in RANGES"
+                  :key="r.key"
+                  class="fp-pill"
+                  :class="{ active: filters.range === r.key }"
+                  @click="filters.range = r.key"
+                >{{ r.label }}</button>
+              </div>
+            </div>
+
+            <div class="fp-divider" />
+
+            <!-- Category -->
+            <div class="fp-section">
+              <div class="fp-label">
+                Category
+                <span v-if="filters.categories.length" class="fp-count">{{ filters.categories.length }} selected</span>
+              </div>
+              <div class="fp-search-wrap">
+                <SvgIcon :svg="iconSearch" :size="12" class="fp-search-icon" />
+                <input
+                  v-model="catSearchFilter"
+                  class="fp-search"
+                  type="text"
+                  placeholder="Search categories…"
+                  autocomplete="off"
+                >
+              </div>
+              <div class="fp-scroll">
+                <button
+                  v-for="cat in filteredCatOptions"
+                  :key="cat.name"
+                  class="fp-check"
+                  :class="{ active: filters.categories.includes(cat.name) }"
+                  @click="toggleCategory(cat.name)"
+                >
+                  <span class="fp-check-box">
+                    <SvgIcon v-if="filters.categories.includes(cat.name)" :svg="iconCheck" :size="10" />
+                  </span>
+                  <span class="fp-check-dot" :style="{ background: cat.color }" />
+                  <span class="fp-check-label">{{ cat.name }}</span>
+                  <span class="fp-check-amt">{{ fmt(cat.total) }}</span>
+                </button>
+                <p v-if="!filteredCatOptions.length" class="fp-empty">No categories</p>
+              </div>
+            </div>
+
+            <div class="fp-divider" />
+
+            <!-- Payment method -->
+            <div class="fp-section">
+              <div class="fp-label">
+                Payment method
+                <span v-if="filters.sources.length" class="fp-count">{{ filters.sources.length }} selected</span>
+              </div>
+              <div v-if="sourcesStore.list.length" class="fp-scroll">
+                <button
+                  v-for="src in sourcesStore.list"
+                  :key="src.id"
+                  class="fp-check"
+                  :class="{ active: filters.sources.includes(src.id) }"
+                  @click="toggleSource(src.id)"
+                >
+                  <span class="fp-check-box">
+                    <SvgIcon v-if="filters.sources.includes(src.id)" :svg="iconCheck" :size="10" />
+                  </span>
+                  <span class="fp-check-dot" :style="{ background: src.color }" />
+                  <span class="fp-check-label">{{ src.name }}</span>
+                  <span class="fp-check-sub">{{ src.type }}</span>
+                </button>
+              </div>
+              <p v-else class="fp-empty">No payment sources set up yet</p>
+            </div>
+
+            <button class="fp-apply" @click="filterOpen = false">
+              Apply · {{ filteredTx.length }} transactions
+            </button>
+
+          </div>
+        </Transition>
+
+        <!-- ══ HERO STATS ════════════════════════════════════════ -->
+        <div class="hero-grid">
+          <div class="hero-card income-card">
+            <div class="hero-label">Income</div>
+            <div class="hero-value">{{ fmt(totalIncome) }}</div>
+            <div class="hero-sub">{{ incomes.length }} tx</div>
+          </div>
+          <div class="hero-card expense-card">
+            <div class="hero-label">Expenses</div>
+            <div class="hero-value">{{ fmt(totalExpense) }}</div>
+            <div class="ratio-track">
               <div
-                class="bar-fill"
-                :style="{ width: ((c.total / topCats[0].total) * 100) + '%', background: COLORS[i % COLORS.length] }"
+                class="ratio-fill"
+                :style="{ width: Math.min(spendRatio, 100) + '%' }"
+                :class="{ overspent: spendRatio > 100 }"
               />
             </div>
-            <span class="cat-pct">{{ ((c.total / totalExpense) * 100).toFixed(0) }}%</span>
-            <span class="cat-amt">{{ fmt(c.total) }}</span>
+            <div class="hero-sub">{{ spendRatio.toFixed(0) }}% of income</div>
+          </div>
+          <div class="hero-card net-card" :class="net >= 0 ? 'positive' : 'negative'">
+            <div class="hero-label">Net</div>
+            <div class="hero-value">{{ fmt(Math.abs(net)) }}</div>
+            <div class="hero-sub">{{ net >= 0 ? '↑ surplus' : '↓ deficit' }}</div>
           </div>
         </div>
-        <p v-else class="no-results">No categories match "{{ catSearch }}"</p>
-      </div>
 
-      <!-- ── 5. By source ─────────────────────────────────── -->
-      <div v-if="sourcesStore.list.length" class="section-card">
-        <div class="section-header">
-          <span class="section-title">By source</span>
-          <span class="section-sub">tap to view detail</span>
+        <!-- ══ INSIGHTS ══════════════════════════════════════════ -->
+        <div v-if="insights.length" class="insights-strip">
+          <div v-for="ins in insights" :key="ins.label" class="insight-chip">
+            <span class="ins-label">{{ ins.label }}</span>
+            <span class="ins-value">{{ ins.value }}</span>
+          </div>
         </div>
-        <div v-if="bySource.length" class="source-breakdown">
-          <button
-            v-for="row in bySource"
-            :key="row.id"
-            class="source-row clickable"
-            @click="selectedSource = sourcesStore.list.find(s => s.id === row.id)"
-          >
-            <div class="source-dot" :style="{ background: row.color }" />
-            <div class="source-info">
-              <span class="source-name">{{ row.name }}</span>
-              <span class="source-type-label">{{ row.txCount }} transactions</span>
+
+        <!-- ══ SPENDING BY CATEGORY ══════════════════════════════ -->
+        <div v-if="topCats.length" class="section-card">
+          <div class="section-header">
+            <span class="section-title">Spending by category</span>
+            <span class="section-sub">{{ topCats.length }} categories</span>
+          </div>
+          <div class="cat-list">
+            <div v-for="(c, i) in topCats" :key="c.category" class="cat-row">
+              <div class="cat-dot" :style="{ background: COLORS[i % COLORS.length] }" />
+              <span class="cat-name">{{ c.category }}</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill"
+                  :style="{ width: ((c.total / topCats[0].total) * 100) + '%', background: COLORS[i % COLORS.length] }"
+                />
+              </div>
+              <span class="cat-pct">{{ ((c.total / totalExpense) * 100).toFixed(0) }}%</span>
+              <span class="cat-amt">{{ fmt(c.total) }}</span>
             </div>
-            <div class="source-stats">
-              <span class="source-out">−{{ fmt(row.totalOut) }}</span>
-              <span class="source-in">+{{ fmt(row.totalIn) }}</span>
-            </div>
-            <SvgIcon :svg="iconChevronRight" :size="13" class="source-chevron" />
-          </button>
+          </div>
         </div>
-        <p v-else class="no-source-hint">
-          Tag transactions with a source to see breakdown here
-        </p>
-      </div>
 
-      <!-- ── 6. Cash flow chart ─────────────────────────────── -->
-      <div class="section-card">
-        <div class="section-title" style="margin-bottom:16px">Cash flow</div>
-        <div class="chart-wrap"><canvas ref="lineCanvas" /></div>
-      </div>
+        <!-- ══ BY SOURCE ═════════════════════════════════════════ -->
+        <div v-if="sourcesStore.list.length" class="section-card">
+          <div class="section-header">
+            <span class="section-title">By payment method</span>
+            <span class="section-sub">tap for detail</span>
+          </div>
+          <div v-if="bySource.length" class="source-breakdown">
+            <button
+              v-for="row in bySource"
+              :key="row.id"
+              class="source-row"
+              @click="selectedSource = sourcesStore.list.find(s => s.id === row.id)"
+            >
+              <div class="source-dot" :style="{ background: row.color }" />
+              <div class="source-info">
+                <span class="source-name">{{ row.name }}</span>
+                <span class="source-meta">{{ row.txCount }} tx · {{ row.type }}</span>
+              </div>
+              <div class="source-stats">
+                <span class="source-out">−{{ fmt(row.totalOut) }}</span>
+                <span class="source-in">+{{ fmt(row.totalIn) }}</span>
+              </div>
+              <SvgIcon :svg="iconChevronRight" :size="13" class="source-chevron" />
+            </button>
+          </div>
+          <p v-else class="hint">Tag transactions with a payment method to see breakdown</p>
+        </div>
 
+        <!-- ══ CASH FLOW ══════════════════════════════════════════ -->
+        <div class="section-card">
+          <div class="section-header">
+            <span class="section-title">Cash flow</span>
+            <span class="section-sub">{{ RANGES.find(r => r.key === filters.range)?.label }}</span>
+          </div>
+          <div class="chart-wrap"><canvas ref="lineCanvas" /></div>
+        </div>
+
+      </template>
     </template>
-    </template><!-- end v-else -->
   </div>
 </template>
 
 <script setup>
-import { computed, ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { computed, ref, watch, onMounted, onUnmounted, nextTick, reactive } from 'vue'
 import { Chart } from 'chart.js/auto'
 import { storeToRefs } from 'pinia'
 import { useSettingsStore }    from '../stores/settings'
 import { useTransactionStore } from '../stores/transactions'
 import { useSourcesStore }     from '../stores/sources'
+import { catColor }            from '../stores/transactions'
 import SvgIcon      from './SvgIcon.vue'
 import SourceDetail from './SourceDetail.vue'
-import { iconChart, iconSearch, iconChevronRight } from '../icons'
+import {
+  iconChart, iconSearch, iconChevronRight,
+  iconClose, iconCheck, iconFilter,
+} from '../icons'
 
 const props = defineProps({ currency: String })
 
@@ -181,24 +291,52 @@ const COLORS = [
 ]
 
 const RANGES = [
-  { key: '1M',  label: '1M'   },
-  { key: '3M',  label: '3M'   },
-  { key: '6M',  label: '6M'   },
-  { key: '1Y',  label: '1Y'   },
-  { key: 'all', label: 'All'  },
+  { key: '1M',  label: '1M'  },
+  { key: '3M',  label: '3M'  },
+  { key: '6M',  label: '6M'  },
+  { key: '1Y',  label: '1Y'  },
+  { key: 'all', label: 'All' },
 ]
 
-// ── State ────────────────────────────────────────────────────────────────────
+// ── Filter state ──────────────────────────────────────────────────────────────
 
-const range          = ref('1M')
-const catSearch      = ref('')
+const filterOpen     = ref(false)
+const catSearchFilter = ref('')
 const selectedSource = ref(null)
 
-// ── Filtered dataset for selected range ──────────────────────────────────────
+const filters = reactive({
+  range:      '1M',   // time period key
+  categories: [],     // string[] of selected category names (empty = all)
+  sources:    [],     // string[] of selected source IDs (empty = all)
+})
+
+const activeFilterCount = computed(() =>
+  (filters.range !== 'all' ? 1 : 0) +
+  filters.categories.length +
+  filters.sources.length
+)
+
+function toggleCategory(cat) {
+  const idx = filters.categories.indexOf(cat)
+  idx === -1 ? filters.categories.push(cat) : filters.categories.splice(idx, 1)
+}
+
+function toggleSource(id) {
+  const idx = filters.sources.indexOf(id)
+  idx === -1 ? filters.sources.push(id) : filters.sources.splice(idx, 1)
+}
+
+function clearFilters() {
+  filters.range      = 'all'
+  filters.categories = []
+  filters.sources    = []
+}
+
+// ── Base dataset — time range applied first ───────────────────────────────────
 
 const rangedTx = computed(() => {
-  if (range.value === 'all') return allTx.value
-  const months = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }[range.value]
+  if (filters.range === 'all') return allTx.value
+  const months = { '1M': 1, '3M': 3, '6M': 6, '1Y': 12 }[filters.range]
   const cutoff = new Date()
   cutoff.setMonth(cutoff.getMonth() - months)
   cutoff.setDate(1)
@@ -206,35 +344,70 @@ const rangedTx = computed(() => {
   return allTx.value.filter(t => new Date(t.created_at) >= cutoff)
 })
 
-const expenses = computed(() => rangedTx.value.filter(t => t.type === 'expense'))
-const incomes  = computed(() => rangedTx.value.filter(t => t.type === 'income'))
+// ── Fully filtered dataset — category + source filters applied ────────────────
+
+const filteredTx = computed(() => {
+  let tx = rangedTx.value
+
+  if (filters.categories.length) {
+    tx = tx.filter(t => filters.categories.includes(t.category))
+  }
+
+  if (filters.sources.length) {
+    tx = tx.filter(t => filters.sources.includes(t.source_id))
+  }
+
+  return tx
+})
+
+// ── Derived data from filteredTx ──────────────────────────────────────────────
+
+const expenses = computed(() => filteredTx.value.filter(t => t.type === 'expense'))
+const incomes  = computed(() => filteredTx.value.filter(t => t.type === 'income'))
 
 const totalExpense = computed(() => expenses.value.reduce((s, t) => s + parseFloat(t.amount), 0))
 const totalIncome  = computed(() => incomes.value.reduce((s, t) => s + parseFloat(t.amount), 0))
 const net          = computed(() => totalIncome.value - totalExpense.value)
-const spendRatio   = computed(() => totalIncome.value > 0 ? (totalExpense.value / totalIncome.value) * 100 : 0)
+const spendRatio   = computed(() =>
+  totalIncome.value > 0 ? (totalExpense.value / totalIncome.value) * 100 : 0
+)
 
-// ── Category breakdown ────────────────────────────────────────────────────────
+// ── Category options for filter panel (from ranged, unfiltered by category) ───
+
+const allCatsInRange = computed(() => {
+  const map = {}
+  rangedTx.value
+    .filter(t => t.type === 'expense')
+    .forEach((t, i) => {
+      if (!map[t.category]) map[t.category] = { name: t.category, total: 0, color: COLORS[Object.keys(map).length % COLORS.length] }
+      map[t.category].total += parseFloat(t.amount)
+    })
+  return Object.values(map).sort((a, b) => b.total - a.total)
+})
+
+const filteredCatOptions = computed(() => {
+  if (!catSearchFilter.value) return allCatsInRange.value
+  const q = catSearchFilter.value.toLowerCase()
+  return allCatsInRange.value.filter(c => c.name.toLowerCase().includes(q))
+})
+
+// ── Spending by category (from filteredTx) ────────────────────────────────────
 
 const topCats = computed(() => {
   const map = {}
-  expenses.value.forEach(t => { map[t.category] = (map[t.category] ?? 0) + parseFloat(t.amount) })
+  expenses.value.forEach(t => {
+    map[t.category] = (map[t.category] ?? 0) + parseFloat(t.amount)
+  })
   return Object.entries(map)
     .map(([category, total]) => ({ category, total }))
     .sort((a, b) => b.total - a.total)
 })
 
-const filteredCats = computed(() => {
-  if (!catSearch.value) return topCats.value
-  const q = catSearch.value.toLowerCase()
-  return topCats.value.filter(c => c.category.toLowerCase().includes(q))
-})
-
-// ── By source (all transaction types) ────────────────────────────────────────
+// ── By source ─────────────────────────────────────────────────────────────────
 
 const bySource = computed(() => {
   const map = {}
-  rangedTx.value.forEach(t => {
+  filteredTx.value.forEach(t => {
     if (!t.source_id) return
     const src = sourcesStore.list.find(s => s.id === t.source_id)
     if (!src) return
@@ -254,21 +427,17 @@ const bySource = computed(() => {
 const insights = computed(() => {
   const out = []
 
-  // Biggest spending category
   if (topCats.value.length) {
-    const top = topCats.value[0]
-    out.push({ label: 'Top category', value: `${top.category} · ${fmt.value(top.total)}` })
+    out.push({ label: 'Top category', value: `${topCats.value[0].category} · ${fmt.value(topCats.value[0].total)}` })
   }
 
-  // Single largest expense
   if (expenses.value.length) {
     const biggest = expenses.value.reduce((a, b) => parseFloat(a.amount) > parseFloat(b.amount) ? a : b)
     out.push({ label: 'Biggest expense', value: `${biggest.category} · ${fmt.value(biggest.amount)}` })
   }
 
-  // Month-on-month expense change (only meaningful for ranges ≥ 2 months)
-  if (range.value !== '1M') {
-    const now   = new Date()
+  if (filters.range !== '1M') {
+    const now    = new Date()
     const mStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const pStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const thisM  = allTx.value.filter(t => t.type === 'expense' && new Date(t.created_at) >= mStart)
@@ -276,16 +445,15 @@ const insights = computed(() => {
     const tTotal = thisM.reduce((s, t) => s + parseFloat(t.amount), 0)
     const pTotal = prevM.reduce((s, t) => s + parseFloat(t.amount), 0)
     if (pTotal > 0) {
-      const pct = ((tTotal - pTotal) / pTotal * 100).toFixed(0)
-      const dir = tTotal >= pTotal ? '↑' : '↓'
-      out.push({ label: 'vs last month', value: `${dir} ${Math.abs(pct)}%` })
+      const pct = Math.abs(((tTotal - pTotal) / pTotal) * 100).toFixed(0)
+      out.push({ label: 'vs last month', value: `${tTotal >= pTotal ? '↑' : '↓'} ${pct}%` })
     }
   }
 
   return out
 })
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
+// ── Cash flow chart ───────────────────────────────────────────────────────────
 
 const lineCanvas = ref(null)
 let lineChart    = null
@@ -303,12 +471,10 @@ function getTheme() {
 async function renderChart() {
   await nextTick()
   if (!lineCanvas.value) return
-
   if (lineChart) { lineChart.destroy(); lineChart = null }
 
-  // Build month buckets for the selected range
   const buckets = {}
-  rangedTx.value.forEach(t => {
+  filteredTx.value.forEach(t => {
     const key = new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', year: '2-digit' })
     if (!buckets[key]) buckets[key] = { expense: 0, income: 0 }
     buckets[key][t.type] += parseFloat(t.amount)
@@ -360,7 +526,7 @@ async function renderChart() {
 }
 
 onMounted(() => { if (allTx.value.length) renderChart() })
-watch([rangedTx, () => props.currency], () => { if (allTx.value.length) renderChart() })
+watch([filteredTx, () => props.currency], () => { if (allTx.value.length) renderChart() })
 onUnmounted(() => { if (lineChart) lineChart.destroy() })
 </script>
 
@@ -370,28 +536,220 @@ onUnmounted(() => { if (lineChart) lineChart.destroy() })
 .state-empty { padding: 60px 0; text-align: center; color: var(--text2); font-size: 0.85rem; }
 .empty-icon  { margin-bottom: 10px; color: var(--text2); }
 
-/* ── Range tabs ──────────────────────────────────────────────── */
-.range-tabs {
-  display: flex; gap: 4px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 4px;
+/* ══ Filter bar ══════════════════════════════════════════════ */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
-.range-tab {
-  flex: 1; padding: 6px 0; border: none; border-radius: 7px;
-  background: none; font-family: 'Inter', sans-serif;
-  font-size: 0.75rem; font-weight: 500; color: var(--text2);
-  cursor: pointer; transition: background var(--transition), color var(--transition);
-}
-.range-tab.active { background: var(--surface2); color: var(--text); }
 
-/* ── Hero stats ──────────────────────────────────────────────── */
+.filter-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all var(--transition);
+  flex-shrink: 0;
+}
+.filter-toggle:hover { border-color: var(--border2); color: var(--text); }
+.filter-toggle.active { border-color: var(--accent); color: var(--accent); background: var(--accent-dim); }
+
+.filter-badge {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-size: 0.6rem;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+  line-height: 1.4;
+}
+
+.active-chips { display: flex; gap: 5px; flex-wrap: wrap; align-items: center; }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.68rem;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.active-chip {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.active-chip:hover { opacity: 0.8; }
+.clear-chip {
+  background: none;
+  border-color: var(--border);
+  color: var(--text2);
+}
+.clear-chip:hover { color: var(--danger); border-color: var(--danger); }
+
+/* ══ Filter panel ════════════════════════════════════════════ */
+.filter-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.fp-section { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+.fp-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fp-count { color: var(--accent); font-weight: 600; }
+
+.fp-divider { height: 1px; background: var(--border); margin: 0; }
+
+/* Period pills */
+.fp-pills { display: flex; gap: 4px; }
+.fp-pill {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text2);
+  cursor: pointer;
+  transition: all var(--transition);
+}
+.fp-pill.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.fp-pill:not(.active):hover { border-color: var(--border2); color: var(--text); }
+
+/* Category search */
+.fp-search-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  transition: border-color var(--transition);
+}
+.fp-search-wrap:focus-within { border-color: var(--accent); }
+.fp-search-icon { color: var(--text2); flex-shrink: 0; }
+.fp-search {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+.fp-search::placeholder { color: var(--text2); }
+
+/* Scrollable check list */
+.fp-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.fp-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  text-align: left;
+  width: 100%;
+  transition: background var(--transition);
+}
+.fp-check:hover { background: var(--surface2); }
+.fp-check.active { background: var(--accent-dim); }
+
+.fp-check-box {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent);
+  transition: border-color var(--transition), background var(--transition);
+}
+.fp-check.active .fp-check-box { background: var(--accent-dim); border-color: var(--accent); }
+
+.fp-check-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.fp-check-label { flex: 1; font-size: 0.78rem; color: var(--text); }
+.fp-check-amt   { font-size: 0.68rem; color: var(--text2); font-family: 'Space Grotesk', sans-serif; }
+.fp-check-sub   { font-size: 0.65rem; color: var(--text2); text-transform: capitalize; }
+.fp-empty       { font-size: 0.75rem; color: var(--text2); padding: 8px; text-align: center; }
+
+/* Apply button */
+.fp-apply {
+  margin: 0;
+  padding: 12px;
+  background: var(--accent);
+  border: none;
+  border-top: 1px solid var(--border);
+  color: var(--accent-text);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--transition);
+}
+.fp-apply:hover { opacity: 0.88; }
+
+/* ══ Hero stats ══════════════════════════════════════════════ */
 .hero-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .hero-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 14px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 12px;
 }
 .hero-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); margin-bottom: 4px; }
 .hero-value { font-family: 'Space Grotesk', sans-serif; font-size: 1rem; font-weight: 600; letter-spacing: -0.02em; }
+.hero-sub   { font-size: 0.6rem; color: var(--text2); margin-top: 4px; }
 .income-card  .hero-value { color: var(--success); }
 .expense-card .hero-value { color: var(--danger); }
 .net-card.positive .hero-value { color: var(--success); }
@@ -400,48 +758,35 @@ onUnmounted(() => { if (lineChart) lineChart.destroy() })
 .ratio-track { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .ratio-fill  { height: 100%; background: var(--danger); border-radius: 2px; transition: width 0.4s ease; }
 .ratio-fill.overspent { background: #f7525a; }
-.ratio-label { font-size: 0.6rem; color: var(--text2); margin-top: 4px; }
-.net-dir     { font-size: 0.62rem; color: var(--text2); margin-top: 4px; }
 
-/* ── Insights ────────────────────────────────────────────────── */
+/* ══ Insights ════════════════════════════════════════════════ */
 .insights-strip { display: flex; flex-direction: column; gap: 6px; }
 .insight-chip {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 9px 12px;
-  background: var(--surface); border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-sm);
 }
 .ins-label { font-size: 0.7rem; color: var(--text2); }
 .ins-value { font-size: 0.75rem; font-weight: 500; color: var(--text); text-align: right; }
 
-/* ── Section cards ───────────────────────────────────────────── */
+/* ══ Section cards ═══════════════════════════════════════════ */
 .section-card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
 }
-.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; gap: 10px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
 .section-title  { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--text2); }
+.section-sub    { font-size: 0.62rem; color: var(--text2); }
 
-/* Category search */
-.search-wrap {
-  display: flex; align-items: center; gap: 6px;
-  background: var(--surface2); border: 1px solid var(--border);
-  border-radius: 6px; padding: 4px 8px;
-  transition: border-color var(--transition);
-}
-.search-wrap:focus-within { border-color: var(--accent); }
-.search-icon { color: var(--text2); flex-shrink: 0; }
-.cat-search {
-  background: none; border: none; outline: none;
-  font-family: 'Inter', sans-serif; font-size: 0.78rem;
-  color: var(--text); width: 90px;
-}
-.cat-search::placeholder { color: var(--text2); }
-
-/* Category rows — horizontal bar */
+/* ══ Category bars ═══════════════════════════════════════════ */
 .cat-list { display: flex; flex-direction: column; gap: 9px; }
 .cat-row  { display: flex; align-items: center; gap: 8px; }
-.cat-row.dimmed { opacity: 0.35; }
 .cat-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
 .cat-name { font-size: 0.75rem; color: var(--text); width: 80px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
@@ -449,43 +794,44 @@ onUnmounted(() => { if (lineChart) lineChart.destroy() })
 .cat-pct  { font-size: 0.65rem; color: var(--text2); width: 28px; text-align: right; flex-shrink: 0; }
 .cat-amt  { font-size: 0.72rem; font-weight: 500; color: var(--text); width: 60px; text-align: right; flex-shrink: 0; font-family: 'Space Grotesk', sans-serif; }
 
-.no-results { font-size: 0.78rem; color: var(--text2); padding: 12px 0; text-align: center; }
-
-/* Income by source */
-.source-breakdown { display: flex; flex-direction: column; gap: 9px; }
-.source-row  { display: flex; align-items: center; gap: 8px; }
-.source-dot  { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-.source-info { display: flex; flex-direction: column; flex: 1; min-width: 0; }
-.source-name { font-size: 0.78rem; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.source-type-label { font-size: 0.6rem; color: var(--text2); margin-top: 1px; }
+/* ══ Source rows ═════════════════════════════════════════════ */
+.source-breakdown { display: flex; flex-direction: column; gap: 4px; }
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 6px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background var(--transition);
+}
+.source-row:hover { background: var(--surface2); }
+.source-dot  { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.source-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.source-name { font-size: 0.78rem; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.source-meta { font-size: 0.6rem; color: var(--text2); text-transform: capitalize; }
 .source-stats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
 .source-out  { font-size: 0.7rem; font-weight: 500; color: var(--danger); font-family: 'Space Grotesk', sans-serif; }
 .source-in   { font-size: 0.7rem; font-weight: 500; color: var(--success); font-family: 'Space Grotesk', sans-serif; }
 .source-chevron { color: var(--text2); flex-shrink: 0; }
-.section-sub { font-size: 0.62rem; color: var(--text2); }
-.no-source-hint { font-size: 0.72rem; color: var(--text2); text-align: center; padding: 12px 0; }
 
-/* Clickable source row */
-.source-row.clickable {
-  width: 100%;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  text-align: left;
-  transition: background var(--transition);
-  padding: 6px 4px;
-}
-.source-row.clickable:hover { background: var(--surface2); }
-
-/* Cash flow chart */
+/* ══ Chart ═══════════════════════════════════════════════════ */
 .chart-wrap { position: relative; height: 220px; }
 
-/* Mobile — shrink hero text */
+.hint { font-size: 0.72rem; color: var(--text2); text-align: center; padding: 12px 0; }
+
+/* ══ Transitions ═════════════════════════════════════════════ */
+.panel-enter-active, .panel-leave-active { transition: all 0.22s ease; }
+.panel-enter-from, .panel-leave-to { opacity: 0; transform: translateY(-8px); }
+
+/* ══ Mobile ══════════════════════════════════════════════════ */
 @media (max-width: 400px) {
-  .hero-grid { grid-template-columns: 1fr 1fr 1fr; }
   .hero-value { font-size: 0.82rem; }
-  .cat-name, .source-name { width: 60px; }
-  .cat-amt,  .source-amt  { width: 50px; }
+  .cat-name   { width: 60px; }
+  .cat-amt    { width: 50px; }
 }
 </style>
